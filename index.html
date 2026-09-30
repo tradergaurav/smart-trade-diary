@@ -3,37 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trade Diary Pro - Fully Interactive Engine</title>
+  <title>Trade Diary - Professional Suite</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-[#0a0e17] text-slate-200 antialiased min-h-screen selection:bg-indigo-500 selection:text-white">
+<body class="bg-[#080c14] text-slate-200 antialiased font-sans min-h-screen">
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
-
-    const CHECKLIST_ITEMS = [
-      "Market Trend Identified (Higher Timeframe)",
-      "Key Support & Resistance Levels Marked",
-      "Risk per Trade Defined (< 2%)",
-      "No Emotional Distraction / Clear Mindset",
-      "Stop Loss & Target Orders Planned",
-      "Waiting Patiently for Setup Trigger"
-    ];
+    const { useState, useEffect, useRef } = React;
 
     function App() {
       const [activeTab, setActiveTab] = useState('Dashboard');
       const [trades, setTrades] = useState(() => {
-        const saved = localStorage.getItem('trade_diary_premium_v2');
-        return saved ? JSON.parse(saved) : [];
+        const saved = localStorage.getItem('trade_diary_ultra_v1');
+        return saved ? JSON.parse(saved) : [
+          { id: 1, date: '2026-09-28', symbol: 'NIFTY', type: 'BUY', qty: 50, entry: 25800, exit: 25950, pnl: '7500.00', strategy: 'Channel Breakout', mistake: 'None', confidence: 85 },
+          { id: 2, date: '2026-09-29', symbol: 'BANKNIFTY', type: 'SELL', qty: 30, entry: 58500, exit: 58800, pnl: '-9000.00', strategy: 'Range Break', mistake: 'FOMO Entry', confidence: 40 },
+          { id: 3, date: '2026-09-30', symbol: 'NIFTY', type: 'BUY', qty: 100, entry: 25900, exit: 26040, pnl: '14000.00', strategy: 'Fibo Level', mistake: 'None', confidence: 90 }
+        ];
       });
 
-      const [checklist, setChecklist] = useState(() => new Array(CHECKLIST_ITEMS.length).fill(false));
       const [showModal, setShowModal] = useState(false);
-
       const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
         symbol: 'NIFTY',
@@ -43,13 +37,87 @@
         exit: '',
         strategy: 'Channel Breakout',
         mistake: 'None',
-        confidence: 80,
-        chartUrl: ''
+        confidence: 80
       });
 
+      const pnlChartRef = useRef(null);
+      const winLossChartRef = useRef(null);
+
       useEffect(() => {
-        localStorage.setItem('trade_diary_premium_v2', JSON.stringify(trades));
+        localStorage.setItem('trade_diary_ultra_v1', JSON.stringify(trades));
       }, [trades]);
+
+      // Render Charts on Dashboard
+      useEffect(() => {
+        if (activeTab !== 'Dashboard') return;
+
+        // P&L Equity Curve Chart
+        if (pnlChartRef.current) {
+          const ctx = pnlChartRef.current.getContext('2d');
+          let cumPnl = 0;
+          const labels = trades.map(t => t.date);
+          const data = trades.map(t => {
+            cumPnl += parseFloat(t.pnl);
+            return cumPnl;
+          });
+
+          if (window.myPnlChart) window.myPnlChart.destroy();
+
+          window.myPnlChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: labels.length ? labels : ['Day 1'],
+              datasets: [{
+                label: 'Cumulative P&L (₹)',
+                data: data.length ? data : [0],
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+                pointRadius: 4,
+                pointBackgroundColor: '#818cf8'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#64748b', font: { size: 10 } } },
+                y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#64748b', font: { size: 10 } } }
+              }
+            }
+          });
+        }
+
+        // Win/Loss Donut Chart
+        if (winLossChartRef.current) {
+          const ctx = winLossChartRef.current.getContext('2d');
+          const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
+          const losses = trades.filter(t => parseFloat(t.pnl) <= 0).length;
+
+          if (window.myWinLossChart) window.myWinLossChart.destroy();
+
+          window.myWinLossChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+              labels: ['Wins', 'Losses'],
+              datasets: [{
+                data: trades.length ? [wins, losses] : [1, 0],
+                backgroundColor: ['#10b981', '#f43f5e'],
+                borderWidth: 0
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              cutout: '75%'
+            }
+          });
+        }
+      }, [activeTab, trades]);
 
       const handleAddTrade = (e) => {
         e.preventDefault();
@@ -59,12 +127,9 @@
         const pnl = (exit - entry) * qty * (formData.type === 'BUY' ? 1 : -1);
 
         const newTrade = { id: Date.now(), ...formData, pnl: pnl.toFixed(2) };
-        setTrades([newTrade, ...trades]);
+        setTrades([...trades, newTrade]);
         setShowModal(false);
-        setFormData({ date: new Date().toISOString().split('T')[0], symbol: 'NIFTY', type: 'BUY', qty: '', entry: '', exit: '', strategy: 'Channel Breakout', mistake: 'None', confidence: 80, chartUrl: '' });
       };
-
-      const deleteTrade = (id) => setTrades(trades.filter(t => t.id !== id));
 
       const totalPnl = trades.reduce((a, b) => a + parseFloat(b.pnl), 0).toFixed(2);
       const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
@@ -73,218 +138,166 @@
       const avgConfidence = trades.length ? (trades.reduce((a, b) => a + Number(b.confidence), 0) / trades.length).toFixed(0) : 50;
 
       const navItems = [
-        { name: 'Dashboard', icon: '📊' },
-        { name: 'Trading Checklist', icon: '✅' },
+        { name: 'Dashboard', icon: '⚡' },
         { name: 'Trades', icon: '📈' },
+        { name: 'Checklist', icon: '✅' },
         { name: 'Strategies', icon: '🧩' },
-        { name: 'Rules', icon: '📜' },
-        { name: 'Mistakes', icon: '⚠️' }
+        { name: 'Mistakes Audit', icon: '⚠️' }
       ];
 
       return (
-        <div class="flex min-h-screen">
+        <div class="flex h-screen overflow-hidden bg-[#080c14]">
           
-          {/* Left Sidebar */}
-          <aside class="w-64 bg-[#0d1322] border-r border-slate-800/80 p-4 flex flex-col justify-between shrink-0">
-            <div class="space-y-6">
-              <div class="flex items-center space-x-2 px-2">
-                <div class="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-white text-sm">T</div>
-                <span class="font-extrabold text-lg tracking-wide text-white">Trade Diary</span>
+          {/* Sidebar */}
+          <aside class="w-64 bg-[#0d1322] border-r border-slate-800/80 p-5 flex flex-col justify-between shrink-0">
+            <div class="space-y-8">
+              <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 bg-gradient-to-tr from-indigo-600 to-indigo-400 rounded-xl flex items-center justify-center font-black text-white shadow-lg shadow-indigo-500/20">T</div>
+                <div>
+                  <h1 class="font-black text-base tracking-wide text-white">Trade Diary</h1>
+                  <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">PRO SYSTEM</span>
+                </div>
               </div>
 
-              <nav class="space-y-1">
+              <nav class="space-y-1.5">
                 {navItems.map((item) => (
                   <button
                     key={item.name}
                     onClick={() => setActiveTab(item.name)}
-                    class={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                    class={`w-full flex items-center space-x-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all ${
                       activeTab === item.name
-                        ? 'bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-600/30'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
                         : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
                     }`}
                   >
-                    <span>{item.icon}</span>
+                    <span class="text-base">{item.icon}</span>
                     <span>{item.name}</span>
                   </button>
                 ))}
               </nav>
             </div>
 
-            <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 flex items-center space-x-3">
-              <div class="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">GD</div>
+            <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80 flex items-center space-x-3">
+              <div class="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-black text-xs border border-indigo-500/30">GD</div>
               <div class="text-xs overflow-hidden">
                 <p class="font-bold text-white truncate">Gaurav Dhiman</p>
-                <p class="text-[10px] text-slate-500 truncate">Pro Trader</p>
+                <p class="text-[10px] text-emerald-400 font-semibold">● Live Account</p>
               </div>
             </div>
           </aside>
 
-          {/* Main Content Area */}
-          <main class="flex-1 flex flex-col min-w-0 bg-[#0a0e17]">
+          {/* Main Area */}
+          <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
             
-            {/* Top Market Ticker Bar */}
-            <div class="bg-[#0f172a]/90 border-b border-slate-800/80 px-4 py-2 flex items-center justify-between text-[11px]">
-              <div class="flex items-center space-x-6 font-mono">
-                <span>Nifty Media: <span class="text-emerald-400 font-bold">+2.53%</span></span>
-                <span>Nifty Metal: <span class="text-rose-400 font-bold">-1.56%</span></span>
-                <span>Nifty Bank: <span class="text-emerald-400 font-bold">+0.95%</span></span>
+            {/* Top Bar */}
+            <header class="bg-[#0d1322]/80 backdrop-blur-md border-b border-slate-800/80 px-6 py-3.5 flex items-center justify-between sticky top-0 z-10">
+              <div class="flex items-center space-x-6 text-xs font-mono">
+                <span class="text-slate-400">NIFTY: <span class="text-emerald-400 font-bold">26,042.80 (+0.4%)</span></span>
+                <span class="text-slate-400">BANKNIFTY: <span class="text-rose-400 font-bold">59,011.35 (-0.2%)</span></span>
               </div>
-              <button onClick={() => setShowModal(true)} class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-md font-bold text-xs flex items-center space-x-1 shadow-md shadow-indigo-600/30">
-                <span>+</span>
-                <span>New Trade</span>
+              <button onClick={() => setShowModal(true)} class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center space-x-2 shadow-lg shadow-indigo-600/30 transition">
+                <span>+ Log New Trade</span>
               </button>
-            </div>
+            </header>
 
-            <div class="p-6 overflow-y-auto">
+            <div class="p-6 space-y-6 max-w-7xl mx-auto w-full">
 
-              {/* 1. DASHBOARD VIEW */}
+              {/* DASHBOARD TAB */}
               {activeTab === 'Dashboard' && (
                 <div class="space-y-6">
+                  
+                  {/* KPI Cards */}
                   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl">
-                      <p class="text-[11px] font-bold text-slate-500 uppercase">HIGHEST P&L</p>
-                      <p class="text-xl font-extrabold text-emerald-400 mt-1">₹{highestPnl}</p>
+                    <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">HIGHEST P&L</p>
+                      <p class="text-2xl font-black text-emerald-400 mt-1">₹{highestPnl}</p>
+                      <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-emerald-500/5 rounded-full blur-xl"></div>
                     </div>
-                    <div class="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl">
-                      <p class="text-[11px] font-bold text-slate-500 uppercase">WIN RATE</p>
-                      <p class="text-xl font-extrabold text-indigo-400 mt-1">{winRate}%</p>
+                    <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">WIN RATE</p>
+                      <p class="text-2xl font-black text-indigo-400 mt-1">{winRate}%</p>
                     </div>
-                    <div class="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl">
-                      <p class="text-[11px] font-bold text-slate-500 uppercase">CONFIDENCE INDEX</p>
-                      <p class="text-xl font-extrabold text-purple-400 mt-1">{avgConfidence}%</p>
+                    <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">AVG RISK / REWARD</p>
+                      <p class="text-2xl font-black text-purple-400 mt-1">1:2.4</p>
                     </div>
-                    <div class="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl">
-                      <p class="text-[11px] font-bold text-slate-500 uppercase">NET P&L</p>
-                      <p class={`text-xl font-extrabold mt-1 ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{totalPnl}</p>
+                    <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">NET REALIZED P&L</p>
+                      <p class={`text-2xl font-black mt-1 ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{totalPnl}</p>
                     </div>
                   </div>
 
-                  <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-xl flex flex-col items-center justify-center h-64">
-                    <span class="text-slate-500 text-xs font-bold uppercase mb-2">Cumulative Realized P&L</span>
-                    <p class={`text-4xl font-black ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{totalPnl}</p>
-                    <p class="text-xs text-slate-500 mt-2">{trades.length} Total Executed Trades Logged</p>
+                  {/* Confidence Bar */}
+                  <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                      <span class="font-bold text-slate-300">Execution Confidence Index</span>
+                      <span class="text-indigo-400 font-mono font-bold">{avgConfidence}% Score</span>
+                    </div>
+                    <div class="h-2 w-full bg-slate-900 rounded-full overflow-hidden p-0.5">
+                      <div class="h-full bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-500 rounded-full transition-all duration-500" style={{ width: `${avgConfidence}%` }}></div>
+                    </div>
                   </div>
+
+                  {/* Charts Grid */}
+                  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl h-80 flex flex-col justify-between">
+                      <div class="flex justify-between items-center">
+                        <span class="font-bold text-xs text-slate-200 uppercase tracking-wider">Cumulative Equity Curve</span>
+                        <span class="text-[10px] text-slate-500 font-mono">Realtime Sync</span>
+                      </div>
+                      <div class="h-60 w-full pt-2">
+                        <canvas ref={pnlChartRef}></canvas>
+                      </div>
+                    </div>
+
+                    <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl h-80 flex flex-col justify-between items-center">
+                      <span class="font-bold text-xs text-slate-200 uppercase tracking-wider w-full text-left">Win / Loss Ratio</span>
+                      <div class="h-48 w-48 relative my-auto">
+                        <canvas ref={winLossChartRef}></canvas>
+                      </div>
+                      <div class="flex space-x-6 text-xs text-slate-400">
+                        <span class="flex items-center"><span class="w-2.5 h-2.5 bg-emerald-500 rounded-full mr-1.5"></span> Wins ({wins})</span>
+                        <span class="flex items-center"><span class="w-2.5 h-2.5 bg-rose-500 rounded-full mr-1.5"></span> Losses ({trades.length - wins})</span>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               )}
 
-              {/* 2. TRADING CHECKLIST VIEW */}
-              {activeTab === 'Trading Checklist' && (
-                <div class="bg-[#0d1322] border border-slate-800/80 p-6 rounded-2xl space-y-4 max-w-2xl mx-auto">
-                  <h2 class="text-base font-bold text-indigo-400 border-b border-slate-800 pb-2">Pre-Market Execution Checklist</h2>
-                  <p class="text-xs text-slate-400">Complete these checks before taking any trade to maintain strict discipline.</p>
-                  <div class="space-y-3 pt-2">
-                    {CHECKLIST_ITEMS.map((item, idx) => (
-                      <label key={idx} class="flex items-center space-x-3 p-3 bg-slate-900/60 rounded-xl border border-slate-800 cursor-pointer text-xs">
-                        <input
-                          type="checkbox"
-                          checked={checklist[idx]}
-                          onChange={() => {
-                            const updated = [...checklist];
-                            updated[idx] = !updated[idx];
-                            setChecklist(updated);
-                          }}
-                          class="accent-indigo-500 w-4 h-4"
-                        />
-                        <span class={checklist[idx] ? 'line-through text-slate-500' : 'text-slate-200'}>{item}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 3. TRADES LOG VIEW */}
+              {/* TRADES LOG TAB */}
               {activeTab === 'Trades' && (
                 <div class="bg-[#0d1322] border border-slate-800/80 rounded-2xl overflow-hidden">
-                  <div class="p-4 border-b border-slate-800 flex justify-between items-center">
-                    <h2 class="font-bold text-sm text-slate-200">Trade Execution Diary</h2>
-                  </div>
+                  <div class="p-4 border-b border-slate-800"><h2 class="font-bold text-sm text-slate-200">Execution Diary Log</h2></div>
                   <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs text-slate-300">
-                      <thead class="bg-slate-950 text-slate-400 uppercase">
+                      <thead class="bg-slate-950 text-slate-500 uppercase text-[10px] tracking-wider">
                         <tr>
-                          <th class="p-3">Date</th>
-                          <th class="p-3">Symbol</th>
-                          <th class="p-3">Strategy</th>
-                          <th class="p-3">Type</th>
-                          <th class="p-3">Qty</th>
-                          <th class="p-3">Entry / Exit</th>
-                          <th class="p-3">P&L</th>
-                          <th class="p-3">Mistake</th>
-                          <th class="p-3">Action</th>
+                          <th class="p-3.5">Date</th>
+                          <th class="p-3.5">Symbol</th>
+                          <th class="p-3.5">Strategy</th>
+                          <th class="p-3.5">Type</th>
+                          <th class="p-3.5">Qty</th>
+                          <th class="p-3.5">Entry / Exit</th>
+                          <th class="p-3.5">P&L</th>
+                          <th class="p-3.5">Mistake</th>
                         </tr>
                       </thead>
-                      <tbody>
-                        {trades.length === 0 ? (
-                          <tr><td colSpan="9" class="p-6 text-center text-slate-500">No trades logged yet. Click "+ New Trade" to start.</td></tr>
-                        ) : (
-                          trades.map(t => (
-                            <tr key={t.id} class="border-b border-slate-800/60 hover:bg-slate-800/30">
-                              <td class="p-3 text-slate-500">{t.date}</td>
-                              <td class="p-3 font-bold text-white">{t.symbol}</td>
-                              <td class="p-3 text-indigo-400">{t.strategy}</td>
-                              <td class={`p-3 font-bold ${t.type === 'BUY' ? 'text-emerald-400' : 'text-amber-400'}`}>{t.type}</td>
-                              <td class="p-3">{t.qty}</td>
-                              <td class="p-3">{t.entry} / {t.exit}</td>
-                              <td class={`p-3 font-bold ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{t.pnl}</td>
-                              <td class="p-3"><span class={`px-2 py-0.5 rounded text-[10px] ${t.mistake === 'None' ? 'bg-slate-900 text-slate-500' : 'bg-rose-950 text-rose-300 border border-rose-800'}`}>{t.mistake}</span></td>
-                              <td class="p-3"><button onClick={() => deleteTrade(t.id)} class="text-rose-400 hover:underline">Delete</button></td>
-                            </tr>
-                          ))
-                        )}
+                      <tbody class="divide-y divide-slate-800/60">
+                        {trades.map(t => (
+                          <tr key={t.id} class="hover:bg-slate-800/20">
+                            <td class="p-3.5 text-slate-500">{t.date}</td>
+                            <td class="p-3.5 font-bold text-white">{t.symbol}</td>
+                            <td class="p-3.5 text-indigo-400 font-semibold">{t.strategy}</td>
+                            <td class={`p-3.5 font-bold ${t.type === 'BUY' ? 'text-emerald-400' : 'text-amber-400'}`}>{t.type}</td>
+                            <td class="p-3.5">{t.qty}</td>
+                            <td class="p-3.5 font-mono">{t.entry} / {t.exit}</td>
+                            <td class={`p-3.5 font-black text-sm ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{t.pnl}</td>
+                            <td class="p-3.5"><span class={`px-2.5 py-1 rounded-md text-[10px] font-bold ${t.mistake === 'None' ? 'bg-slate-900 text-slate-500' : 'bg-rose-950 text-rose-300 border border-rose-800/60'}`}>{t.mistake}</span></td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
-                  </div>
-                </div>
-              )}
-
-              {/* 4. STRATEGIES VIEW */}
-              {activeTab === 'Strategies' && (
-                <div class="bg-[#0d1322] border border-slate-800/80 p-6 rounded-2xl space-y-4">
-                  <h2 class="text-sm font-bold text-slate-200">Strategy Performance Analysis</h2>
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {["Channel Breakout", "Fibo Level", "W / M Pattern", "Range Break"].map((strat, i) => {
-                      const stratTrades = trades.filter(t => t.strategy === strat);
-                      const stratPnl = stratTrades.reduce((a, b) => a + parseFloat(b.pnl), 0).toFixed(2);
-                      return (
-                        <div key={i} class="bg-slate-900/60 border border-slate-800 p-4 rounded-xl">
-                          <p class="font-bold text-xs text-indigo-300">{strat}</p>
-                          <p class="text-xs text-slate-500 mt-1">Trades: {stratTrades.length}</p>
-                          <p class={`text-lg font-bold mt-2 ${stratPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{stratPnl}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* 5. RULES VIEW */}
-              {activeTab === 'Rules' && (
-                <div class="bg-[#0d1322] border border-slate-800/80 p-6 rounded-2xl space-y-4 max-w-2xl">
-                  <h2 class="text-sm font-bold text-slate-200">Personal Trading System Rules</h2>
-                  <ul class="space-y-3 text-xs text-slate-300 list-disc pl-5">
-                    <li>Never take more than 2 trades per day.</li>
-                    <li>Always place Stop Loss in the system, never in mind.</li>
-                    <li>No trading after 2 consecutive losses.</li>
-                    <li>Do not enter based on Telegram tips or social media reels.</li>
-                  </ul>
-                </div>
-              )}
-
-              {/* 6. MISTAKES TRACKER VIEW */}
-              {activeTab === 'Mistakes' && (
-                <div class="bg-[#0d1322] border border-slate-800/80 p-6 rounded-2xl space-y-4">
-                  <h2 class="text-sm font-bold text-rose-400">Psychological Mistakes Breakdown</h2>
-                  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {["FOMO", "Revenge", "No SL", "Over-leveraging"].map((m, i) => {
-                      const count = trades.filter(t => t.mistake.includes(m)).length;
-                      return (
-                        <div key={i} class="bg-slate-900/60 border border-slate-800 p-4 rounded-xl text-center">
-                          <p class="text-xs text-slate-400">{m}</p>
-                          <p class="text-2xl font-black text-rose-400 mt-1">{count}</p>
-                          <p class="text-[10px] text-slate-500 mt-1">Occurrences</p>
-                        </div>
-                      );
-                    })}
                   </div>
                 </div>
               )}
@@ -292,42 +305,28 @@
             </div>
           </main>
 
-          {/* New Trade Modal */}
+          {/* Modal */}
           {showModal && (
-            <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div class="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
               <div class="bg-[#0d1322] border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4">
                 <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <h3 class="font-bold text-sm text-white">Log New Execution</h3>
-                  <button onClick={() => setShowModal(false)} class="text-slate-400 hover:text-white">✕</button>
+                  <h3 class="font-bold text-sm text-white">Log Trade Execution</h3>
+                  <button onClick={() => setShowModal(false)} class="text-slate-500 hover:text-white">✕</button>
                 </div>
                 <form onSubmit={handleAddTrade} class="space-y-3 text-xs">
                   <div class="grid grid-cols-2 gap-3">
-                    <input type="text" placeholder="Symbol (e.g. NIFTY)" value={formData.symbol} onChange={e=>setFormData({...formData, symbol: e.target.value.toUpperCase()})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-lg" required />
-                    <select value={formData.type} onChange={e=>setFormData({...formData, type: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-lg">
+                    <input type="text" placeholder="Symbol (NIFTY)" value={formData.symbol} onChange={e=>setFormData({...formData, symbol: e.target.value.toUpperCase()})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" required />
+                    <select value={formData.type} onChange={e=>setFormData({...formData, type: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
                       <option value="BUY">BUY</option>
                       <option value="SELL">SELL</option>
                     </select>
                   </div>
                   <div class="grid grid-cols-3 gap-3">
-                    <input type="number" placeholder="Qty" value={formData.qty} onChange={e=>setFormData({...formData, qty: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-lg" required />
-                    <input type="number" step="any" placeholder="Entry" value={formData.entry} onChange={e=>setFormData({...formData, entry: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-lg" required />
-                    <input type="number" step="any" placeholder="Exit" value={formData.exit} onChange={e=>setFormData({...formData, exit: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-lg" required />
+                    <input type="number" placeholder="Qty" value={formData.qty} onChange={e=>setFormData({...formData, qty: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" required />
+                    <input type="number" step="any" placeholder="Entry" value={formData.entry} onChange={e=>setFormData({...formData, entry: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" required />
+                    <input type="number" step="any" placeholder="Exit" value={formData.exit} onChange={e=>setFormData({...formData, exit: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" required />
                   </div>
-                  <div class="grid grid-cols-2 gap-3">
-                    <select value={formData.strategy} onChange={e=>setFormData({...formData, strategy: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-lg text-indigo-300">
-                      <option value="Channel Breakout">Channel Breakout</option>
-                      <option value="Fibo Level">Fibo Level</option>
-                      <option value="W / M Pattern">W / M Pattern</option>
-                      <option value="Range Break">Range Break</option>
-                    </select>
-                    <select value={formData.mistake} onChange={e=>setFormData({...formData, mistake: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-lg text-rose-300">
-                      <option value="None">No Mistake</option>
-                      <option value="FOMO Entry">FOMO Entry</option>
-                      <option value="Revenge Trade">Revenge Trade</option>
-                      <option value="No SL">No Stop Loss</option>
-                    </select>
-                  </div>
-                  <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2.5 rounded-xl text-white transition">Save Execution</button>
+                  <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-3 rounded-xl text-white transition shadow-lg shadow-indigo-600/30">Save Trade</button>
                 </form>
               </div>
             </div>
