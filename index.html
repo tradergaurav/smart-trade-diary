@@ -15,16 +15,178 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    function SmartTradeDiary() {
+    function App() {
+      const [trades, setTrades] = useState(() => {
+        const saved = localStorage.getItem('smart_trades');
+        return saved ? JSON.parse(saved) : [];
+      });
+
+      const [formData, setFormData] = useState({
+        symbol: '',
+        type: 'BUY',
+        entry: '',
+        exit: '',
+        qty: '',
+        mindsetScore: 8,
+        notes: ''
+      });
+
+      useEffect(() => {
+        localStorage.setItem('smart_trades', JSON.stringify(trades));
+      }, [trades]);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!formData.symbol || !formData.entry || !formData.exit || !formData.qty) return;
+
+        const pnl = (parseFloat(formData.exit) - parseFloat(formData.entry)) * parseFloat(formData.qty) * (formData.type === 'BUY' ? 1 : -1);
+        
+        const newTrade = {
+          id: Date.now(),
+          ...formData,
+          pnl: pnl.toFixed(2),
+          date: new Date().toLocaleDateString()
+        };
+
+        setTrades([newTrade, ...trades]);
+        setFormData({ symbol: '', type: 'BUY', entry: '', exit: '', qty: '', mindsetScore: 8, notes: '' });
+      };
+
+      const totalPnl = trades.reduce((acc, t) => acc + parseFloat(t.pnl), 0).toFixed(2);
+      const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
+      const winRate = trades.length ? ((wins / trades.length) * 100).toFixed(1) : 0;
+
       return (
-        <div class="p-8 text-center">
-          <h1 class="text-3xl font-bold text-emerald-400">Smart Trade Diary</h1>
-          <p class="mt-2 text-slate-400">Dashboard setup is complete!</p>
+        <div class="max-w-6xl mx-auto p-4 md:p-8">
+          {/* Header */}
+          <div class="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
+            <div>
+              <h1 class="text-2xl md:text-3xl font-bold text-emerald-400">Smart Trade Diary</h1>
+              <p class="text-xs md:text-sm text-slate-400">Psychology & Performance Tracker</p>
+            </div>
+            <div class="text-right">
+              <span class="text-xs text-slate-400">Net P&L</span>
+              <p class={`text-xl font-bold ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                ${totalPnl}
+              </p>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div class="grid grid-cols-3 gap-4 mb-8">
+            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+              <p class="text-xs text-slate-400">Total Trades</p>
+              <p class="text-xl font-bold text-slate-200">{trades.length}</p>
+            </div>
+            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+              <p class="text-xs text-slate-400">Win Rate</p>
+              <p class="text-xl font-bold text-indigo-400">{winRate}%</p>
+            </div>
+            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+              <p class="text-xs text-slate-400">Avg Mindset</p>
+              <p class="text-xl font-bold text-amber-400">
+                {trades.length ? (trades.reduce((a,b) => a + Number(b.mindsetScore), 0) / trades.length).toFixed(1) : 'N/A'}/10
+              </p>
+            </div>
+          </div>
+
+          {/* Trade Form */}
+          <form onSubmit={handleSubmit} class="bg-slate-800/40 p-6 rounded-2xl border border-slate-700/60 mb-8 space-y-4">
+            <h2 class="text-lg font-semibold text-slate-200">Log New Trade</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <input 
+                type="text" placeholder="Symbol (e.g. NIFTY)" 
+                value={formData.symbol} onChange={e => setFormData({...formData, symbol: e.target.value.toUpperCase()})}
+                class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm focus:outline-none focus:border-emerald-500" required 
+              />
+              <select 
+                value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}
+                class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
+              >
+                <option value="BUY">BUY</option>
+                <option value="SELL">SELL</option>
+              </select>
+              <input 
+                type="number" step="any" placeholder="Entry Price" 
+                value={formData.entry} onChange={e => setFormData({...formData, entry: e.target.value})}
+                class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm focus:outline-none focus:border-emerald-500" required 
+              />
+              <input 
+                type="number" step="any" placeholder="Exit Price" 
+                value={formData.exit} onChange={e => setFormData({...formData, exit: e.target.value})}
+                class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm focus:outline-none focus:border-emerald-500" required 
+              />
+              <input 
+                type="number" placeholder="Quantity" 
+                value={formData.qty} onChange={e => setFormData({...formData, qty: e.target.value})}
+                class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm focus:outline-none focus:border-emerald-500" required 
+              />
+              <div class="col-span-1">
+                <label class="text-xs text-slate-400 block mb-1">Mindset Score: {formData.mindsetScore}/10</label>
+                <input 
+                  type="range" min="1" max="10" 
+                  value={formData.mindsetScore} onChange={e => setFormData({...formData, mindsetScore: e.target.value})}
+                  class="w-full accent-emerald-500" 
+                />
+              </div>
+              <input 
+                type="text" placeholder="Notes / Mistakes" 
+                value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})}
+                class="col-span-2 bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm focus:outline-none focus:border-emerald-500" 
+              />
+            </div>
+            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-lg transition">
+              Save Trade
+            </button>
+          </form>
+
+          {/* Trade History */}
+          <div class="bg-slate-800/40 rounded-2xl border border-slate-700/60 overflow-hidden">
+            <div class="p-4 border-b border-slate-700/60">
+              <h2 class="text-lg font-semibold text-slate-200">Trade History</h2>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-slate-300">
+                <thead class="bg-slate-900/50 text-xs text-slate-400 uppercase">
+                  <tr>
+                    <th class="p-3">Date</th>
+                    <th class="p-3">Symbol</th>
+                    <th class="p-3">Type</th>
+                    <th class="p-3">Qty</th>
+                    <th class="p-3">Entry</th>
+                    <th class="p-3">Exit</th>
+                    <th class="p-3">P&L</th>
+                    <th class="p-3">Mindset</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trades.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" class="p-4 text-center text-slate-500">No trades logged yet.</td>
+                    </tr>
+                  ) : (
+                    trades.map(t => (
+                      <tr key={t.id} class="border-b border-slate-800 hover:bg-slate-800/30">
+                        <td class="p-3 text-xs text-slate-400">{t.date}</td>
+                        <td class="p-3 font-semibold">{t.symbol}</td>
+                        <td class={`p-3 text-xs font-bold ${t.type === 'BUY' ? 'text-emerald-400' : 'text-amber-400'}`}>{t.type}</td>
+                        <td class="p-3">{t.qty}</td>
+                        <td class="p-3">{t.entry}</td>
+                        <td class="p-3">{t.exit}</td>
+                        <td class={`p-3 font-bold ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>${t.pnl}</td>
+                        <td class="p-3">{t.mindsetScore}/10</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<SmartTradeDiary />);
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   </script>
 </body>
 </html>
