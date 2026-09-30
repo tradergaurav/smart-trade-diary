@@ -3,549 +3,72 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trade Diary - Premium Dashboard</title>
+  <title>Smart Trade Diary - Timeline & Execution Latency Engine</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-[#090d16] text-slate-200 antialiased font-sans min-h-screen selection:bg-indigo-600 selection:text-white">
+<body class="bg-[#090d16] text-slate-200 antialiased font-sans min-h-screen selection:bg-blue-600 selection:text-white">
   <div id="root"></div>
 
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
-    const SETUPS = ["Channel Breakout", "Range Break", "Inside Candle", "Fibo Level", "W / M Pattern", "Cup & Handle"];
-    const MISTAKES = ["FOMO Entry", "Revenge Trade", "Tip / Social Media Entry", "Distraction / Reel Watching", "No Stop Loss", "Early Exit"];
-
-    function App() {
-      const [activeTab, setActiveTab] = useState('Dashboard');
-      const [trades, setTrades] = useState(() => {
-        const saved = localStorage.getItem('tradediary_premium_v9');
-        return saved ? JSON.parse(saved) : [
-          { id: 1, date: '2026-09-28', symbol: 'NIFTY', type: 'BUY', qty: 50, entry: 25800, exit: 25950, pnl: '7500.00', strategy: 'Channel Breakout', mistake: 'None', confidence: 85, chartUrl: '' },
-          { id: 2, date: '2026-09-29', symbol: 'BANKNIFTY', type: 'SELL', qty: 30, entry: 58500, exit: 58800, pnl: '-9000.00', strategy: 'Range Break', mistake: 'FOMO Entry', confidence: 40, chartUrl: '' },
-          { id: 3, date: '2026-09-30', symbol: 'NIFTY', type: 'BUY', qty: 100, entry: 25900, exit: 26040, pnl: '14000.00', strategy: 'Fibo Level', mistake: 'None', confidence: 90, chartUrl: '' }
-        ];
-      });
-
-      const [showModal, setShowModal] = useState(false);
-      const [formData, setFormData] = useState({
-        date: new Date().toISOString().split('T')[0],
-        symbol: 'NIFTY',
-        type: 'BUY',
-        qty: '',
-        entry: '',
-        exit: '',
-        strategy: 'Channel Breakout',
-        mistake: 'None',
-        confidence: 80,
-        chartUrl: ''
-      });
-
-      const pnlChartRef = useRef(null);
-      const winLossChartRef = useRef(null);
-
-      useEffect(() => {
-        localStorage.setItem('tradediary_premium_v9', JSON.stringify(trades));
-      }, [trades]);
-
-      // Render Dashboard Charts
-      useEffect(() => {
-        if (activeTab !== 'Dashboard') return;
-
-        // Cumulative Equity Curve
-        if (pnlChartRef.current) {
-          const ctx = pnlChartRef.current.getContext('2d');
-          let cumPnl = 0;
-          const labels = trades.map(t => t.date);
-          const data = trades.map(t => {
-            cumPnl += parseFloat(t.pnl);
-            return cumPnl;
-          });
-
-          if (window.myPnlChart) window.myPnlChart.destroy();
-          window.myPnlChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-              labels: labels.length ? labels : ['Day 1'],
-              datasets: [{
-                label: 'Cumulative P&L',
-                data: data.length ? data : [0],
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.08)',
-                fill: true,
-                tension: 0.35,
-                borderWidth: 2,
-                pointRadius: 3,
-                pointBackgroundColor: '#60a5fa'
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              scales: {
-                x: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#475569', font: { size: 10 } } },
-                y: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#475569', font: { size: 10 } } }
-              }
-            }
-          });
-        }
-
-        // Win/Loss Donut
-        if (winLossChartRef.current) {
-          const ctx = winLossChartRef.current.getContext('2d');
-          const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
-          const losses = trades.filter(t => parseFloat(t.pnl) <= 0).length;
-
-          if (window.myWinLossChart) window.myWinLossChart.destroy();
-          window.myWinLossChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-              labels: ['Wins', 'Losses'],
-              datasets: [{
-                data: trades.length ? [wins, losses] : [0, 1],
-                backgroundColor: ['#10b981', '#ef4444'],
-                borderWidth: 0
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              cutout: '80%'
-            }
-          });
-        }
-      }, [activeTab, trades]);
-
-      const handleAddTrade = (e) => {
-        e.preventDefault();
-        const entry = parseFloat(formData.entry);
-        const exit = parseFloat(formData.exit);
-        const qty = parseFloat(formData.qty);
-        const pnl = (exit - entry) * qty * (formData.type === 'BUY' ? 1 : -1);
-
-        const newTrade = { id: Date.now(), ...formData, pnl: pnl.toFixed(2) };
-        setTrades([...trades, newTrade]);
-        setShowModal(false);
-      };
-
-      const deleteTrade = (id) => setTrades(trades.filter(t => t.id !== id));
-
-      const totalPnl = trades.reduce((a, b) => a + parseFloat(b.pnl), 0).toFixed(2);
-      const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
-      const winRate = trades.length ? ((wins / trades.length) * 100).toFixed(0) : 0;
-      const highestPnl = trades.length ? Math.max(...trades.map(t => parseFloat(t.pnl))).toFixed(2) : '0.00';
-      const avgConfidence = trades.length ? (trades.reduce((a, b) => a + Number(b.confidence), 0) / trades.length).toFixed(0) : 50;
-
-      const navItems = [
-        { name: 'Dashboard', icon: '📊' },
-        { name: 'Trading Checklist', icon: '✅' },
-        { name: 'Trades', icon: '📈' },
-        { name: 'Strategies', icon: '🧩' },
-        { name: 'Rules', icon: '📜' },
-        { name: 'Mistakes', icon: '⚠️' },
-        { name: 'Reports', icon: '📉' },
-        { name: 'Risk Management', icon: '🛡️' },
-        { name: 'Market Analysis', icon: '🌐' },
-        { name: 'Paper trading', icon: '📝' },
-        { name: 'Community', icon: '👥' },
-        { name: 'Challenge', icon: '🏆' },
-        { name: 'Calendar', icon: '📅' }
-      ];
-
-      return (
-        <div class="flex h-screen overflow-hidden bg-[#090d16] text-slate-300">
-          
-          {/* Left Navigation Sidebar */}
-          <aside class="w-60 bg-[#0d1320] border-r border-slate-800/80 p-4 flex flex-col justify-between shrink-0">
-            <div class="space-y-6 overflow-y-auto pr-1">
-              <div class="flex items-center space-x-2.5 px-2">
-                <div class="w-6 h-6 bg-blue-600 rounded flex items-center justify-center font-black text-white text-xs">📈</div>
-                <span class="font-extrabold text-sm tracking-tight text-white">Trade Diary</span>
-              </div>
-
-              <nav class="space-y-0.5">
-                {navItems.map((item) => (
-                  <button
-                    key={item.name}
-                    onClick={() => setActiveTab(item.name)}
-                    class={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                      activeTab === item.name
-                        ? 'bg-blue-600/90 text-white font-bold shadow-md shadow-blue-600/20'
-                        : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
-                    }`}
-                  >
-                    <span class="text-sm">{item.icon}</span>
-                    <span>{item.name}</span>
-                  </button>
-                ))}
-              </nav>
-            </div>
-
-            <div class="p-2.5 bg-[#0a0f1d] rounded-xl border border-slate-800/80 flex items-center space-x-2.5">
-              <div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">GD</div>
-              <div class="text-xs overflow-hidden">
-                <p class="font-bold text-white text-[11px] truncate">Gaurav Dhiman</p>
-                <p class="text-[9px] text-emerald-400 font-semibold">Pro Plan</p>
-              </div>
-            </div>
-          </aside>
-
-          {/* Main Display Engine */}
-          <main class="flex-1 flex flex-col min-w-0 overflow-y-auto bg-[#090d16]">
-            
-            {/* Top Bar Tickers */}
-            <div class="bg-[#0b101c] border-b border-slate-800/80 px-5 py-2 flex items-center justify-between text-[11px] whitespace-nowrap overflow-x-auto scrollbar-none">
-              <div class="flex items-center space-x-5 font-mono text-[10px]">
-                <span>Nifty Media: <span class="text-emerald-400 font-bold">+2.53%</span></span>
-                <span>Nifty Metal: <span class="text-rose-400 font-bold">-1.56%</span></span>
-                <span>Nifty Pharma: <span class="text-rose-400 font-bold">-1.88%</span></span>
-                <span>Nifty Pvt Bank: <span class="text-emerald-400 font-bold">+0.95%</span></span>
-                <span>Nifty PSU Bank: <span class="text-emerald-400 font-bold">+0.54%</span></span>
-                <span>Nifty Fin Service: <span class="text-emerald-400 font-bold">+0.13%</span></span>
-              </div>
-              <div class="flex items-center space-x-2.5 shrink-0 ml-4">
-                <button class="bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded text-[10px]">Indian ▾</button>
-                <button class="bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded text-[10px]">Last 30 Days ▾</button>
-                <button onClick={() => setShowModal(true)} class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded font-bold text-[11px] shadow-md shadow-blue-600/30">
-                  + New Trade
-                </button>
-              </div>
-            </div>
-
-            {/* Dashboard Workspace */}
-            <div class="p-6 space-y-5 max-w-[1400px] mx-auto w-full">
-
-              {activeTab === 'Dashboard' && (
-                <div class="space-y-5">
-                  
-                  {/* Top Notification Bar */}
-                  <div class="bg-[#0d1527] border border-blue-900/40 p-3 rounded-xl flex items-center justify-between text-xs">
-                    <div class="flex items-center space-x-3">
-                      <span class="text-blue-400">🔔</span>
-                      <div>
-                        <p class="font-bold text-slate-200">Stay on Track with Your Trading Journal</p>
-                        <p class="text-[10px] text-slate-400">Get timely reminders to keep your journal up to date and never miss a trade analysis.</p>
-                      </div>
-                    </div>
-                    <div class="flex space-x-2">
-                      <button class="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold">Enable</button>
-                      <button class="bg-slate-800 text-slate-400 px-3 py-1 rounded text-xs">Later</button>
-                    </div>
-                  </div>
-
-                  {/* 4 KPI Metric Cards */}
-                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">HIGHEST P&L</p>
-                      <p class="text-xl font-extrabold text-emerald-400 mt-1">₹{highestPnl}</p>
-                      <p class="text-[9px] text-slate-500 mt-1">0% vs last 30 days</p>
-                    </div>
-                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">WIN RATE</p>
-                      <p class="text-xl font-extrabold text-blue-400 mt-1">{winRate}%</p>
-                      <p class="text-[9px] text-slate-500 mt-1">0% vs last 30 days</p>
-                    </div>
-                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">AVG. RISK/REWARD</p>
-                      <p class="text-xl font-extrabold text-purple-400 mt-1">1:2</p>
-                      <p class="text-[9px] text-slate-500 mt-1">0% vs last 30 days</p>
-                    </div>
-                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">TRADES THIS MONTH</p>
-                      <p class="text-xl font-extrabold text-amber-400 mt-1">{trades.length}</p>
-                      <p class="text-[9px] text-slate-500 mt-1">0 vs last 30 days</p>
-                    </div>
-                  </div>
-
-                  {/* Confidence Index Gauge */}
-                  <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl space-y-2">
-                    <div class="flex justify-between items-center text-xs">
-                      <span class="font-bold text-slate-300">Confidence Index</span>
-                      <span class="text-slate-500 text-[10px]">Last 30 Days</span>
-                    </div>
-                    <div class="h-2 w-full bg-slate-900 rounded-full overflow-hidden p-0.5 relative">
-                      <div class="h-full bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-500 rounded-full" style={{ width: `${avgConfidence}%` }}></div>
-                    </div>
-                    <div class="flex justify-between text-[9px] text-slate-500">
-                      <span>Low</span>
-                      <span>High</span>
-                    </div>
-                  </div>
-
-                  {/* Cumulative P&L & Top Trades */}
-                  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                    <div class="lg:col-span-2 bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-72 flex flex-col justify-between">
-                      <div class="flex justify-between items-center">
-                        <span class="font-bold text-xs text-slate-300">Cumulative P&L</span>
-                        <div class="flex space-x-1 text-[9px] bg-slate-900 p-0.5 rounded border border-slate-800">
-                          <button class="px-2 py-0.5 bg-blue-600 rounded text-white font-bold">D</button>
-                          <button class="px-2 py-0.5 text-slate-400">W</button>
-                          <button class="px-2 py-0.5 text-slate-400">M</button>
-                        </div>
-                      </div>
-                      <div class="h-56 w-full pt-2">
-                        <canvas ref={pnlChartRef}></canvas>
-                      </div>
-                    </div>
-
-                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-72 flex flex-col justify-between">
-                      <div class="flex justify-between items-center">
-                        <span class="font-bold text-xs text-slate-300">Top Trades</span>
-                        <span class="text-[10px] text-blue-400 cursor-pointer">View All ➔</span>
-                      </div>
-                      <div class="flex-1 flex flex-col items-center justify-center text-xs">
-                        {trades.length === 0 ? (
-                          <p class="text-slate-600 text-xs">No top trades yet</p>
-                        ) : (
-                          <div class="w-full space-y-2 overflow-y-auto max-h-48 pr-1">
-                            {trades.slice(0, 4).map(t => (
-                              <div key={t.id} class="flex justify-between p-2 bg-[#090e18] rounded border border-slate-800/60 text-xs">
-                                <span class="font-bold text-white">{t.symbol} ({t.strategy})</span>
-                                <span class={parseFloat(t.pnl) >= 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>₹{t.pnl}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Win/Loss & Strategy Performance */}
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-52 flex flex-col justify-between">
-                      <span class="font-bold text-xs text-slate-300">Win/Loss Distribution</span>
-                      <div class="h-32 w-32 relative my-auto mx-auto">
-                        <canvas ref={winLossChartRef}></canvas>
-                      </div>
-                    </div>
-
-                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-52 flex flex-col justify-between">
-                      <span class="font-bold text-xs text-slate-300">Strategy vs P&L</span>
-                      <div class="flex-1 flex items-center justify-center text-slate-500 text-xs">
-                        {trades.length === 0 ? "No strategy insights yet" : (
-                          <div class="w-full space-y-1.5 overflow-y-auto max-h-36 pr-1">
-                            {SETUPS.map((strat, i) => {
-                              const stratTrades = trades.filter(t => t.strategy === strat);
-                              const stratPnl = stratTrades.reduce((a, b) => a + parseFloat(b.pnl), 0).toFixed(2);
-                              return (
-                                <div key={i} class="flex justify-between text-xs p-1.5 bg-slate-900/50 rounded border border-slate-800">
-                                  <span class="text-slate-400">{strat}</span>
-                                  <span class={`font-bold ${stratPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{stratPnl}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Mistakes & Daily Heatmap */}
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-48 flex flex-col justify-between">
-                      <span class="font-bold text-xs text-slate-300">Most Common Mistakes</span>
-                      <div class="flex-1 flex flex-col items-center justify-center text-xs">
-                        {trades.filter(t => t.mistake !== 'None').length === 0 ? (
-                          <p class="text-emerald-500 font-bold">✔ No mistakes found! Keep up the discipline.</p>
-                        ) : (
-                          <div class="w-full space-y-1 text-xs">
-                            {MISTAKES.map((m, i) => {
-                              const count = trades.filter(t => t.mistake === m).length;
-                              if (!count) return null;
-                              return (
-                                <div key={i} class="flex justify-between p-1 text-rose-300 bg-rose-950/20 rounded">
-                                  <span>{m}</span>
-                                  <span class="font-bold">{count} times</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-48 flex flex-col justify-between">
-                      <span class="font-bold text-xs text-slate-300">Daily P&L Calendar Heatmap</span>
-                      <div class="grid grid-cols-7 gap-1 pt-1">
-                        {Array.from({ length: 21 }).map((_, i) => {
-                          const trade = trades[i % trades.length];
-                          const pnl = trade ? parseFloat(trade.pnl) : 0;
-                          return (
-                            <div key={i} class={`h-8 rounded flex items-center justify-center text-[9px] font-mono border border-slate-800 ${!trade ? 'bg-slate-900/40 text-slate-600' : (pnl >= 0 ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800' : 'bg-rose-950/80 text-rose-400 border-rose-800')}`}>
-                              {trade ? `₹${pnl}` : '-'}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-              {/* TRADES LOG TABLE TAB */}
-              {activeTab === 'Trades' && (
-                <div class="bg-[#0c1220] border border-slate-800 rounded-xl overflow-hidden">
-                  <div class="p-4 border-b border-slate-800 flex justify-between items-center">
-                    <h2 class="font-bold text-xs text-slate-200">Trade Execution Log</h2>
-                  </div>
-                  <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs text-slate-300">
-                      <thead class="bg-slate-950 text-slate-500 uppercase text-[9px]">
-                        <tr>
-                          <th class="p-3">Date</th>
-                          <th class="p-3">Symbol</th>
-                          <th class="p-3">Strategy</th>
-                          <th class="p-3">Type</th>
-                          <th class="p-3">Qty</th>
-                          <th class="p-3">Entry / Exit</th>
-                          <th class="p-3">P&L</th>
-                          <th class="p-3">Mistake Tag</th>
-                          <th class="p-3">TradingView Chart</th>
-                          <th class="p-3">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-slate-800/60">
-                        {trades.map(t => (
-                          <tr key={t.id} class="hover:bg-slate-800/20">
-                            <td class="p-3 text-slate-500">{t.date}</td>
-                            <td class="p-3 font-bold text-white">{t.symbol}</td>
-                            <td class="p-3 text-blue-400 font-medium">{t.strategy}</td>
-                            <td class={`p-3 font-bold ${t.type === 'BUY' ? 'text-emerald-400' : 'text-amber-400'}`}>{t.type}</td>
-                            <td class="p-3">{t.qty}</td>
-                            <td class="p-3 font-mono">{t.entry} / {t.exit}</td>
-                            <td class={`p-3 font-black ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{t.pnl}</td>
-                            <td class="p-3"><span class={`px-2 py-0.5 rounded text-[10px] ${t.mistake === 'None' ? 'bg-slate-900 text-slate-500' : 'bg-rose-950 text-rose-300 border border-rose-800'}`}>{t.mistake}</span></td>
-                            <td class="p-3">{t.chartUrl ? <a href={t.chartUrl} target="_blank" class="text-blue-400 underline font-bold">Chart</a> : '-'}</td>
-                            <td class="p-3"><button onClick={() => deleteTrade(t.id)} class="text-rose-400 hover:underline">Delete</button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </main>
-
-          {/* New Execution Entry Modal */}
-          {showModal && (
-            <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-              <div class="bg-[#0c1220] border border-slate-800 rounded-xl w-full max-w-md p-5 space-y-4">
-                <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
-                  <h3 class="font-bold text-xs text-white">Log Execution to Diary</h3>
-                  <button onClick={() => setShowModal(false)} class="text-slate-500 hover:text-white">✕</button>
-                </div>
-                <form onSubmit={handleAddTrade} class="space-y-3 text-xs">
-                  <div class="grid grid-cols-2 gap-2.5">
-                    <input type="text" placeholder="Symbol (NIFTY)" value={formData.symbol} onChange={e=>setFormData({...formData, symbol: e.target.value.toUpperCase()})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
-                    <select value={formData.type} onChange={e=>setFormData({...formData, type: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded">
-                      <option value="BUY">BUY</option>
-                      <option value="SELL">SELL</option>
-                    </select>
-                  </div>
-                  <div class="grid grid-cols-3 gap-2.5">
-                    <input type="number" placeholder="Qty" value={formData.qty} onChange={e=>setFormData({...formData, qty: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
-                    <input type="number" step="any" placeholder="Entry" value={formData.entry} onChange={e=>setFormData({...formData, entry: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
-                    <input type="number" step="any" placeholder="Exit" value={formData.exit} onChange={e=>setFormData({...formData, exit: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
-                  </div>
-                  <div class="grid grid-cols-2 gap-2.5">
-                    <select value={formData.strategy} onChange={e=>setFormData({...formData, strategy: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded text-blue-300">
-                      {SETUPS.map((s, idx) => <option key={idx} value={s}>{s}</option>)}
-                    </select>
-                    <select value={formData.mistake} onChange={e=>setFormData({...formData, mistake: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded text-rose-300">
-                      <option value="None">No Mistake</option>
-                      {MISTAKES.map((m, idx) => <option key={idx} value={m}>{m}</option>)}
-                    </select>
-                  </div>
-                  <input type="url" placeholder="TradingView Screenshot Link" value={formData.chartUrl} onChange={e=>setFormData({...formData, chartUrl: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded w-full" />
-                  <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 font-bold py-2.5 rounded text-white transition shadow-md shadow-blue-600/30">
-                    Save Trade to Diary
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
-
-        </div>
-      );
-    }
-
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-  </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Trade Diary - Custom Style Suite</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body class="bg-[#080c14] text-slate-200 antialiased font-sans min-h-screen">
-  <div id="root"></div>
-
-  <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
-
-    const SETUPS = ["Channel Breakout", "Range Break", "Inside Candle", "Fibo Level", "W / M Pattern", "Cup & Handle", "System Rule"];
-    const MISTAKES = ["None", "FOMO Entry", "Revenge Trade", "Tip / Social Media Entry", "Distraction / Reel Watching", "No SL Placed", "Early Exit"];
-    const MINDSET_RULES = [
-      "HTF Support & Resistance Marked", "Setup Trigger Wait Followed", "Risk Sizing Below 2%",
-      "No Emotional Distraction / Reels", "SL & Target Placed in System", "Strict Rules Followed"
+    const OUTCOME_TAGS = [
+      "Target Hit", "Trail Target Hit", "CTC Target Hit",
+      "SL Hit", "SL CTC Hit", "Missed - Hit Target Later", "Avoided - Saved Loss"
     ];
 
+    const STATUS_OPTIONS = ["PLANNED", "TAKEN", "AVOIDED", "MISSED"];
+
     function App() {
       const [activeTab, setActiveTab] = useState('Dashboard');
       const [trades, setTrades] = useState(() => {
-        const saved = localStorage.getItem('trade_diary_custom_style');
+        const saved = localStorage.getItem('trade_diary_pipeline_v1');
         return saved ? JSON.parse(saved) : [];
       });
 
       const [showModal, setShowModal] = useState(false);
+      const [editingTrade, setEditingTrade] = useState(null);
+
       const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
+        planTime: '09:30',
+        entryTime: '',
+        status: 'PLANNED',
         symbol: 'NIFTY',
         type: 'BUY',
         setup: 'Channel Breakout',
+        mindsetOk: true,
         qty: '',
         entry: '',
         exit: '',
         sl: '',
         target: '',
-        resultTag: 'Target Hit',
-        mistake: 'None',
+        outcome: 'Target Hit',
         chartUrl: '',
-        confidence: 85,
-        notes: ''
+        notes: '',
+        postAnalysis: ''
       });
 
       const pnlChartRef = useRef(null);
-      const winLossChartRef = useRef(null);
 
       useEffect(() => {
-        localStorage.setItem('trade_diary_custom_style', JSON.stringify(trades));
+        localStorage.setItem('trade_diary_pipeline_v1', JSON.stringify(trades));
       }, [trades]);
 
+      // Equity Curve Chart
       useEffect(() => {
         if (activeTab !== 'Dashboard') return;
-
         if (pnlChartRef.current) {
           const ctx = pnlChartRef.current.getContext('2d');
           let cumPnl = 0;
-          const labels = trades.map(t => t.date);
-          const data = trades.map(t => {
-            cumPnl += parseFloat(t.pnl);
+          const takenTrades = trades.filter(t => t.status === 'TAKEN');
+          const labels = takenTrades.map(t => t.date);
+          const data = takenTrades.map(t => {
+            cumPnl += parseFloat(t.pnl || 0);
             return cumPnl;
           });
 
@@ -555,10 +78,10 @@
             data: {
               labels: labels.length ? labels : ['Day 1'],
               datasets: [{
-                label: 'Equity Curve (₹)',
+                label: 'Realized Cumulative P&L (₹)',
                 data: data.length ? data : [0],
-                borderColor: '#6366f1',
-                backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 fill: true,
                 tension: 0.35,
                 borderWidth: 2,
@@ -570,79 +93,75 @@
               maintainAspectRatio: false,
               plugins: { legend: { display: false } },
               scales: {
-                x: { grid: { color: 'rgba(255, 255, 255, 0.05)' } },
-                y: { grid: { color: 'rgba(255, 255, 255, 0.05)' } }
+                x: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#64748b' } },
+                y: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#64748b' } }
               }
-            }
-          });
-        }
-
-        if (winLossChartRef.current) {
-          const ctx = winLossChartRef.current.getContext('2d');
-          const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
-          const losses = trades.filter(t => parseFloat(t.pnl) <= 0).length;
-
-          if (window.myWinLossChart) window.myWinLossChart.destroy();
-          window.myWinLossChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-              labels: ['Wins', 'Losses'],
-              datasets: [{
-                data: trades.length ? [wins, losses] : [1, 0],
-                backgroundColor: ['#10b981', '#f43f5e'],
-                borderWidth: 0
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              cutout: '75%'
             }
           });
         }
       }, [activeTab, trades]);
 
-      const handleAddTrade = (e) => {
-        e.preventDefault();
-        const entry = parseFloat(formData.entry);
-        const exit = parseFloat(formData.exit);
-        const qty = parseFloat(formData.qty);
-        const pnl = (exit - entry) * qty * (formData.type === 'BUY' ? 1 : -1);
+      const calculateTimeGap = (pTime, eTime) => {
+        if (!pTime || !eTime) return '0 mins';
+        const [pH, pM] = pTime.split(':').map(Number);
+        const [eH, eM] = eTime.split(':').map(Number);
+        const diff = (eH * 60 + eM) - (pH * 60 + pM);
+        return diff >= 0 ? `${diff} mins` : 'N/A';
+      };
 
-        const newTrade = { id: Date.now(), ...formData, pnl: pnl.toFixed(2) };
-        setTrades([newTrade, ...trades]);
+      const handleSaveTrade = (e) => {
+        e.preventDefault();
+        let pnl = '0.00';
+        if (formData.status === 'TAKEN' && formData.entry && formData.exit && formData.qty) {
+          const entry = parseFloat(formData.entry);
+          const exit = parseFloat(formData.exit);
+          const qty = parseFloat(formData.qty);
+          pnl = ((exit - entry) * qty * (formData.type === 'BUY' ? 1 : -1)).toFixed(2);
+        }
+
+        const timeGap = calculateTimeGap(formData.planTime, formData.entryTime);
+
+        if (editingTrade) {
+          setTrades(trades.map(t => t.id === editingTrade.id ? { ...t, ...formData, pnl, timeGap } : t));
+        } else {
+          setTrades([{ id: Date.now(), ...formData, pnl, timeGap }, ...trades]);
+        }
+
         setShowModal(false);
+        setEditingTrade(null);
+      };
+
+      const openEditModal = (trade) => {
+        setEditingTrade(trade);
+        setFormData({ ...trade });
+        setShowModal(true);
       };
 
       const deleteTrade = (id) => setTrades(trades.filter(t => t.id !== id));
 
-      const totalPnl = trades.reduce((a, b) => a + parseFloat(b.pnl), 0).toFixed(2);
-      const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
-      const winRate = trades.length ? ((wins / trades.length) * 100).toFixed(0) : 0;
-      const fomoCount = trades.filter(t => t.mistake.includes('FOMO') || t.mistake.includes('Revenge')).length;
+      const takenTrades = trades.filter(t => t.status === 'TAKEN');
+      const totalPnl = takenTrades.reduce((a, b) => a + parseFloat(b.pnl || 0), 0).toFixed(2);
+      const wins = takenTrades.filter(t => parseFloat(t.pnl) > 0).length;
+      const winRate = takenTrades.length ? ((wins / takenTrades.length) * 100).toFixed(0) : 0;
 
       return (
-        <div class="flex h-screen overflow-hidden bg-[#080c14]">
+        <div class="flex h-screen overflow-hidden bg-[#090d16] text-slate-300">
           
-          {/* Sidebar */}
-          <aside class="w-64 bg-[#0d1322] border-r border-slate-800 p-5 flex flex-col justify-between shrink-0">
-            <div class="space-y-8">
-              <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 bg-gradient-to-tr from-indigo-600 to-indigo-400 rounded-xl flex items-center justify-center font-black text-white shadow-lg">T</div>
-                <div>
-                  <h1 class="font-black text-base text-white">Trade Diary</h1>
-                  <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">GAURAV PRO SYSTEM</span>
-                </div>
+          {/* Left Sidebar */}
+          <aside class="w-60 bg-[#0d1320] border-r border-slate-800/80 p-4 flex flex-col justify-between shrink-0">
+            <div class="space-y-6">
+              <div class="flex items-center space-x-2 px-2">
+                <div class="w-7 h-7 bg-blue-600 rounded flex items-center justify-center font-black text-white text-xs">📊</div>
+                <span class="font-extrabold text-sm tracking-tight text-white">Trade Diary Pro</span>
               </div>
 
-              <nav class="space-y-1.5">
-                {['Dashboard', 'Journal', 'Setups & Rules', 'Mistake Audit'].map((tab) => (
+              <nav class="space-y-1">
+                {['Dashboard', 'Execution Pipeline', 'Mindset & Time Gap Analytics'].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    class={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-bold transition ${
-                      activeTab === tab ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800/50'
+                    class={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition ${
+                      activeTab === tab ? 'bg-blue-600 text-white font-bold shadow-md' : 'text-slate-400 hover:bg-slate-800/40'
                     }`}
                   >
                     {tab}
@@ -651,105 +170,107 @@
               </nav>
             </div>
 
-            <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center space-x-3">
-              <div class="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-black text-xs">GD</div>
+            <div class="p-2.5 bg-[#0a0f1d] rounded-xl border border-slate-800 flex items-center space-x-2.5">
+              <div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">GD</div>
               <div class="text-xs">
-                <p class="font-bold text-white">Gaurav Dhiman</p>
-                <p class="text-[10px] text-emerald-400 font-semibold">● Active Trader</p>
+                <p class="font-bold text-white text-[11px]">Gaurav Dhiman</p>
+                <p class="text-[9px] text-emerald-400">Pro Timeline Suite</p>
               </div>
             </div>
           </aside>
 
-          {/* Main Area */}
+          {/* Main Content */}
           <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
             
-            <header class="bg-[#0d1322]/80 border-b border-slate-800 px-6 py-3.5 flex items-center justify-between sticky top-0 z-10">
+            <header class="bg-[#0b101c] border-b border-slate-800/80 px-6 py-3.5 flex items-center justify-between sticky top-0 z-10">
               <div class="flex space-x-6 text-xs font-mono">
-                <span class="text-slate-400">NIFTY: <span class="text-emerald-400 font-bold">26,042.80</span></span>
-                <span class="text-slate-400">BANKNIFTY: <span class="text-rose-400 font-bold">59,011.35</span></span>
+                <span>NIFTY: <span class="text-emerald-400 font-bold">26,042.80</span></span>
+                <span>BANKNIFTY: <span class="text-rose-400 font-bold">59,011.35</span></span>
               </div>
-              <button onClick={() => setShowModal(true)} class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg">
-                + Log Trade Execution
+              <button onClick={() => {
+                setEditingTrade(null);
+                setFormData({ date: new Date().toISOString().split('T')[0], planTime: '09:30', entryTime: '', status: 'PLANNED', symbol: 'NIFTY', type: 'BUY', setup: 'Channel Breakout', mindsetOk: true, qty: '', entry: '', exit: '', sl: '', target: '', outcome: 'Target Hit', chartUrl: '', notes: '', postAnalysis: '' });
+                setShowModal(true);
+              }} class="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-1.5 rounded font-bold text-xs shadow-md">
+                + Plan New Trade
               </button>
             </header>
 
-            <div class="p-6 space-y-6 max-w-7xl mx-auto w-full">
+            <div class="p-6 space-y-5 max-w-[1400px] mx-auto w-full">
 
               {activeTab === 'Dashboard' && (
-                <div class="space-y-6">
+                <div class="space-y-5">
                   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-[#0d1322] border border-slate-800 p-5 rounded-2xl">
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
                       <p class="text-[10px] font-bold text-slate-500 uppercase">NET REALIZED P&L</p>
                       <p class={`text-2xl font-black mt-1 ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{totalPnl}</p>
                     </div>
-                    <div class="bg-[#0d1322] border border-slate-800 p-5 rounded-2xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase">WIN RATE</p>
-                      <p class="text-2xl font-black text-indigo-400 mt-1">{winRate}%</p>
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">TAKEN TRADES WIN RATE</p>
+                      <p class="text-2xl font-black text-blue-400 mt-1">{winRate}%</p>
                     </div>
-                    <div class="bg-[#0d1322] border border-slate-800 p-5 rounded-2xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase">TOTAL EXECUTIONS</p>
-                      <p class="text-2xl font-black text-amber-400 mt-1">{trades.length}</p>
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">MISSED TRADES</p>
+                      <p class="text-2xl font-black text-amber-400 mt-1">{trades.filter(t => t.status === 'MISSED').length}</p>
                     </div>
-                    <div class="bg-[#0d1322] border border-slate-800 p-5 rounded-2xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase">FOMO / REVENGE TRADES</p>
-                      <p class="text-2xl font-black text-rose-400 mt-1">{fomoCount}</p>
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">AVOIDED TRADES</p>
+                      <p class="text-2xl font-black text-indigo-400 mt-1">{trades.filter(t => t.status === 'AVOIDED').length}</p>
                     </div>
                   </div>
 
-                  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="lg:col-span-2 bg-[#0d1322] border border-slate-800 p-5 rounded-2xl h-80">
-                      <span class="font-bold text-xs text-slate-200 uppercase">Realized Cumulative Equity Curve</span>
-                      <div class="h-60 w-full pt-2"><canvas ref={pnlChartRef}></canvas></div>
-                    </div>
-
-                    <div class="bg-[#0d1322] border border-slate-800 p-5 rounded-2xl h-80 flex flex-col justify-between items-center">
-                      <span class="font-bold text-xs text-slate-200 uppercase w-full text-left">Win / Loss Ratio</span>
-                      <div class="h-44 w-44"><canvas ref={winLossChartRef}></canvas></div>
-                      <div class="flex space-x-6 text-xs text-slate-400">
-                        <span>Wins ({wins})</span>
-                        <span>Losses ({trades.length - wins})</span>
-                      </div>
-                    </div>
+                  <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-72">
+                    <span class="font-bold text-xs text-slate-300">Cumulative Realized P&L Curve</span>
+                    <div class="h-56 w-full pt-2"><canvas ref={pnlChartRef}></canvas></div>
                   </div>
                 </div>
               )}
 
-              {activeTab === 'Journal' && (
-                <div class="bg-[#0d1322] border border-slate-800 rounded-2xl overflow-hidden">
-                  <div class="p-4 border-b border-slate-800"><h2 class="font-bold text-sm text-slate-200">Execution & Proof Diary Log</h2></div>
+              {/* EXECUTION PIPELINE TAB */}
+              {activeTab === 'Execution Pipeline' && (
+                <div class="bg-[#0c1220] border border-slate-800 rounded-xl overflow-hidden">
+                  <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                    <h2 class="font-bold text-xs text-slate-200">Timeline & Post-Execution Diary</h2>
+                  </div>
                   <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs text-slate-300">
-                      <thead class="bg-slate-950 text-slate-500 uppercase text-[10px]">
+                      <thead class="bg-slate-950 text-slate-500 uppercase text-[9px]">
                         <tr>
-                          <th class="p-3.5">Date</th>
-                          <th class="p-3.5">Symbol</th>
-                          <th class="p-3.5">Setup</th>
-                          <th class="p-3.5">Type</th>
-                          <th class="p-3.5">Qty</th>
-                          <th class="p-3.5">Entry/Exit</th>
-                          <th class="p-3.5">Result</th>
-                          <th class="p-3.5">P&L</th>
-                          <th class="p-3.5">Mistake</th>
-                          <th class="p-3.5">Chart Link</th>
-                          <th class="p-3.5">Action</th>
+                          <th class="p-3">Status</th>
+                          <th class="p-3">Symbol</th>
+                          <th class="p-3">Plan / Entry Time</th>
+                          <th class="p-3">Time Gap</th>
+                          <th class="p-3">Setup</th>
+                          <th class="p-3">Entry/Exit</th>
+                          <th class="p-3">Outcome</th>
+                          <th class="p-3">P&L</th>
+                          <th class="p-3">Post Analysis</th>
+                          <th class="p-3">Action</th>
                         </tr>
                       </thead>
                       <tbody class="divide-y divide-slate-800/60">
                         {trades.map(t => (
                           <tr key={t.id} class="hover:bg-slate-800/20">
-                            <td class="p-3.5 text-slate-500">{t.date}</td>
-                            <td class="p-3.5 font-bold text-white">{t.symbol}</td>
-                            <td class="p-3.5 text-indigo-400 font-semibold">{t.setup}</td>
-                            <td class={`p-3.5 font-bold ${t.type === 'BUY' ? 'text-emerald-400' : 'text-amber-400'}`}>{t.type}</td>
-                            <td class="p-3.5">{t.qty}</td>
-                            <td class="p-3.5 font-mono">{t.entry} / {t.exit}</td>
-                            <td class="p-3.5"><span class="bg-slate-900 border border-slate-700 px-2 py-0.5 rounded">{t.resultTag}</span></td>
-                            <td class={`p-3.5 font-black text-sm ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{t.pnl}</td>
-                            <td class="p-3.5"><span class={`px-2 py-0.5 rounded text-[10px] ${t.mistake === 'None' ? 'bg-slate-900 text-slate-500' : 'bg-rose-950 text-rose-300 border border-rose-800'}`}>{t.mistake}</span></td>
-                            <td class="p-3.5">
-                              {t.chartUrl ? <a href={t.chartUrl} target="_blank" class="text-indigo-400 font-bold underline">Chart</a> : '-'}
+                            <td class="p-3">
+                              <span class={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                t.status === 'PLANNED' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
+                                t.status === 'TAKEN' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
+                                t.status === 'MISSED' ? 'bg-rose-950 text-rose-300 border border-rose-800' :
+                                'bg-slate-800 text-slate-300'
+                              }`}>{t.status}</span>
                             </td>
-                            <td class="p-3.5"><button onClick={() => deleteTrade(t.id)} class="text-rose-400 hover:underline">Delete</button></td>
+                            <td class="p-3 font-bold text-white">{t.symbol}</td>
+                            <td class="p-3 text-slate-400 font-mono">{t.planTime} $\rightarrow$ {t.entryTime || 'N/A'}</td>
+                            <td class="p-3 text-indigo-400 font-bold font-mono">{t.timeGap}</td>
+                            <td class="p-3 text-blue-400">{t.setup}</td>
+                            <td class="p-3 font-mono">{t.entry || '-'} / {t.exit || '-'}</td>
+                            <td class="p-3"><span class="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">{t.outcome}</span></td>
+                            <td class={`p-3 font-black ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{t.pnl}</td>
+                            <td class="p-3 text-slate-400 max-w-xs truncate">{t.postAnalysis || '-'}</td>
+                            <td class="p-3 space-x-2">
+                              <button onClick={() => openEditModal(t)} class="text-blue-400 hover:underline font-bold">Edit/Execute</button>
+                              <button onClick={() => deleteTrade(t.id)} class="text-rose-400 hover:underline">Delete</button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -763,40 +284,73 @@
 
           {/* Modal */}
           {showModal && (
-            <div class="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-              <div class="bg-[#0d1322] border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4">
-                <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <h3 class="font-bold text-sm text-white">Log Custom Execution</h3>
+            <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div class="bg-[#0c1220] border border-slate-800 rounded-xl w-full max-w-lg p-5 space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
+                  <h3 class="font-bold text-xs text-white">{editingTrade ? 'Update Execution Status' : 'Plan New Trade'}</h3>
                   <button onClick={() => setShowModal(false)} class="text-slate-500 hover:text-white">✕</button>
                 </div>
-                <form onSubmit={handleAddTrade} class="space-y-3 text-xs">
-                  <div class="grid grid-cols-3 gap-3">
-                    <input type="text" placeholder="Symbol (NIFTY)" value={formData.symbol} onChange={e=>setFormData({...formData, symbol: e.target.value.toUpperCase()})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" required />
-                    <select value={formData.setup} onChange={e=>setFormData({...formData, setup: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
-                      {SETUPS.map((s, idx) => <option key={idx} value={s}>{s}</option>)}
-                    </select>
-                    <select value={formData.type} onChange={e=>setFormData({...formData, type: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
+
+                <form onSubmit={handleSaveTrade} class="space-y-3 text-xs">
+                  
+                  {/* Mindset Check */}
+                  <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
+                    <span class="font-bold text-slate-300">Pre-Trade Mindset Check:</span>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                      <input type="checkbox" checked={formData.mindsetOk} onChange={e=>setFormData({...formData, mindsetOk: e.target.checked})} class="accent-emerald-500 w-4 h-4" />
+                      <span class={formData.mindsetOk ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                        {formData.mindsetOk ? 'Mindset OK (Calm/Disciplined)' : 'Emotional / Distracted'}
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Status & Timing */}
+                  <div class="grid grid-cols-3 gap-2.5">
+                    <div>
+                      <label class="text-[10px] text-slate-500 block mb-1">Status</label>
+                      <select value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded">
+                        {STATUS_OPTIONS.map((st, i) => <option key={i} value={st}>{st}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label class="text-[10px] text-slate-500 block mb-1">Plan Time</label>
+                      <input type="time" value={formData.planTime} onChange={e=>setFormData({...formData, planTime: e.target.value})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded" required />
+                    </div>
+                    <div>
+                      <label class="text-[10px] text-slate-500 block mb-1">Execution Entry Time</label>
+                      <input type="time" value={formData.entryTime} onChange={e=>setFormData({...formData, entryTime: e.target.value})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded" />
+                    </div>
+                  </div>
+
+                  {/* Details */}
+                  <div class="grid grid-cols-3 gap-2.5">
+                    <input type="text" placeholder="Symbol (NIFTY)" value={formData.symbol} onChange={e=>setFormData({...formData, symbol: e.target.value.toUpperCase()})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
+                    <input type="number" placeholder="Qty" value={formData.qty} onChange={e=>setFormData({...formData, qty: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" />
+                    <select value={formData.type} onChange={e=>setFormData({...formData, type: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded">
                       <option value="BUY">BUY</option>
                       <option value="SELL">SELL</option>
                     </select>
                   </div>
-                  <div class="grid grid-cols-4 gap-3">
-                    <input type="number" placeholder="Qty" value={formData.qty} onChange={e=>setFormData({...formData, qty: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" required />
-                    <input type="number" step="any" placeholder="Entry" value={formData.entry} onChange={e=>setFormData({...formData, entry: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" required />
-                    <input type="number" step="any" placeholder="Exit" value={formData.exit} onChange={e=>setFormData({...formData, exit: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" required />
-                    <select value={formData.resultTag} onChange={e=>setFormData({...formData, resultTag: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
-                      <option value="Target Hit">Target Hit</option>
-                      <option value="SL Hit">SL Hit</option>
-                      <option value="CTC">CTC</option>
+
+                  <div class="grid grid-cols-2 gap-2.5">
+                    <input type="number" step="any" placeholder="Entry Price" value={formData.entry} onChange={e=>setFormData({...formData, entry: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" />
+                    <input type="number" step="any" placeholder="Exit Price" value={formData.exit} onChange={e=>setFormData({...formData, exit: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" />
+                  </div>
+
+                  {/* Outcome Tag */}
+                  <div>
+                    <label class="text-[10px] text-slate-500 block mb-1">Trade Outcome / Result Tag</label>
+                    <select value={formData.outcome} onChange={e=>setFormData({...formData, outcome: e.target.value})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded text-emerald-300">
+                      {OUTCOME_TAGS.map((tag, idx) => <option key={idx} value={tag}>{tag}</option>)}
                     </select>
                   </div>
-                  <div class="grid grid-cols-2 gap-3">
-                    <select value={formData.mistake} onChange={e=>setFormData({...formData, mistake: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-rose-300">
-                      {MISTAKES.map((m, idx) => <option key={idx} value={m}>{m}</option>)}
-                    </select>
-                    <input type="url" placeholder="TradingView Screenshot URL" value={formData.chartUrl} onChange={e=>setFormData({...formData, chartUrl: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" />
-                  </div>
-                  <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-3 rounded-xl text-white transition shadow-lg">Save Trade to Custom Diary</button>
+
+                  {/* Post Analysis */}
+                  <textarea placeholder="Post Analysis: Missed to kyon hua? Avoid kiya to kya result rha?" value={formData.postAnalysis} onChange={e=>setFormData({...formData, postAnalysis: e.target.value})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded h-16 text-xs"></textarea>
+
+                  <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 font-bold py-2.5 rounded text-white transition shadow-md shadow-blue-600/30">
+                    {editingTrade ? 'Update Execution & Calculate Time Gap' : 'Save Plan to Timeline'}
+                  </button>
                 </form>
               </div>
             </div>
