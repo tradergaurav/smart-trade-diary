@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trade Diary - Professional Suite</title>
+  <title>Smart Trade Diary - Custom Style Suite</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -16,15 +16,18 @@
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
+    const SETUPS = ["Channel Breakout", "Range Break", "Inside Candle", "Fibo Level", "W / M Pattern", "Cup & Handle", "System Rule"];
+    const MISTAKES = ["None", "FOMO Entry", "Revenge Trade", "Tip / Social Media Entry", "Distraction / Reel Watching", "No SL Placed", "Early Exit"];
+    const MINDSET_RULES = [
+      "HTF Support & Resistance Marked", "Setup Trigger Wait Followed", "Risk Sizing Below 2%",
+      "No Emotional Distraction / Reels", "SL & Target Placed in System", "Strict Rules Followed"
+    ];
+
     function App() {
       const [activeTab, setActiveTab] = useState('Dashboard');
       const [trades, setTrades] = useState(() => {
-        const saved = localStorage.getItem('trade_diary_ultra_v1');
-        return saved ? JSON.parse(saved) : [
-          { id: 1, date: '2026-09-28', symbol: 'NIFTY', type: 'BUY', qty: 50, entry: 25800, exit: 25950, pnl: '7500.00', strategy: 'Channel Breakout', mistake: 'None', confidence: 85 },
-          { id: 2, date: '2026-09-29', symbol: 'BANKNIFTY', type: 'SELL', qty: 30, entry: 58500, exit: 58800, pnl: '-9000.00', strategy: 'Range Break', mistake: 'FOMO Entry', confidence: 40 },
-          { id: 3, date: '2026-09-30', symbol: 'NIFTY', type: 'BUY', qty: 100, entry: 25900, exit: 26040, pnl: '14000.00', strategy: 'Fibo Level', mistake: 'None', confidence: 90 }
-        ];
+        const saved = localStorage.getItem('trade_diary_custom_style');
+        return saved ? JSON.parse(saved) : [];
       });
 
       const [showModal, setShowModal] = useState(false);
@@ -32,26 +35,29 @@
         date: new Date().toISOString().split('T')[0],
         symbol: 'NIFTY',
         type: 'BUY',
+        setup: 'Channel Breakout',
         qty: '',
         entry: '',
         exit: '',
-        strategy: 'Channel Breakout',
+        sl: '',
+        target: '',
+        resultTag: 'Target Hit',
         mistake: 'None',
-        confidence: 80
+        chartUrl: '',
+        confidence: 85,
+        notes: ''
       });
 
       const pnlChartRef = useRef(null);
       const winLossChartRef = useRef(null);
 
       useEffect(() => {
-        localStorage.setItem('trade_diary_ultra_v1', JSON.stringify(trades));
+        localStorage.setItem('trade_diary_custom_style', JSON.stringify(trades));
       }, [trades]);
 
-      // Render Charts on Dashboard
       useEffect(() => {
         if (activeTab !== 'Dashboard') return;
 
-        // P&L Equity Curve Chart
         if (pnlChartRef.current) {
           const ctx = pnlChartRef.current.getContext('2d');
           let cumPnl = 0;
@@ -62,21 +68,19 @@
           });
 
           if (window.myPnlChart) window.myPnlChart.destroy();
-
           window.myPnlChart = new Chart(ctx, {
             type: 'line',
             data: {
               labels: labels.length ? labels : ['Day 1'],
               datasets: [{
-                label: 'Cumulative P&L (₹)',
+                label: 'Equity Curve (₹)',
                 data: data.length ? data : [0],
                 borderColor: '#6366f1',
-                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                backgroundColor: 'rgba(99, 102, 241, 0.15)',
                 fill: true,
-                tension: 0.4,
+                tension: 0.35,
                 borderWidth: 2,
-                pointRadius: 4,
-                pointBackgroundColor: '#818cf8'
+                pointRadius: 4
               }]
             },
             options: {
@@ -84,21 +88,19 @@
               maintainAspectRatio: false,
               plugins: { legend: { display: false } },
               scales: {
-                x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#64748b', font: { size: 10 } } },
-                y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#64748b', font: { size: 10 } } }
+                x: { grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+                y: { grid: { color: 'rgba(255, 255, 255, 0.05)' } }
               }
             }
           });
         }
 
-        // Win/Loss Donut Chart
         if (winLossChartRef.current) {
           const ctx = winLossChartRef.current.getContext('2d');
           const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
           const losses = trades.filter(t => parseFloat(t.pnl) <= 0).length;
 
           if (window.myWinLossChart) window.myWinLossChart.destroy();
-
           window.myWinLossChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
@@ -127,61 +129,51 @@
         const pnl = (exit - entry) * qty * (formData.type === 'BUY' ? 1 : -1);
 
         const newTrade = { id: Date.now(), ...formData, pnl: pnl.toFixed(2) };
-        setTrades([...trades, newTrade]);
+        setTrades([newTrade, ...trades]);
         setShowModal(false);
       };
+
+      const deleteTrade = (id) => setTrades(trades.filter(t => t.id !== id));
 
       const totalPnl = trades.reduce((a, b) => a + parseFloat(b.pnl), 0).toFixed(2);
       const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
       const winRate = trades.length ? ((wins / trades.length) * 100).toFixed(0) : 0;
-      const highestPnl = trades.length ? Math.max(...trades.map(t => parseFloat(t.pnl))).toFixed(2) : '0.00';
-      const avgConfidence = trades.length ? (trades.reduce((a, b) => a + Number(b.confidence), 0) / trades.length).toFixed(0) : 50;
-
-      const navItems = [
-        { name: 'Dashboard', icon: '⚡' },
-        { name: 'Trades', icon: '📈' },
-        { name: 'Checklist', icon: '✅' },
-        { name: 'Strategies', icon: '🧩' },
-        { name: 'Mistakes Audit', icon: '⚠️' }
-      ];
+      const fomoCount = trades.filter(t => t.mistake.includes('FOMO') || t.mistake.includes('Revenge')).length;
 
       return (
         <div class="flex h-screen overflow-hidden bg-[#080c14]">
           
           {/* Sidebar */}
-          <aside class="w-64 bg-[#0d1322] border-r border-slate-800/80 p-5 flex flex-col justify-between shrink-0">
+          <aside class="w-64 bg-[#0d1322] border-r border-slate-800 p-5 flex flex-col justify-between shrink-0">
             <div class="space-y-8">
               <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 bg-gradient-to-tr from-indigo-600 to-indigo-400 rounded-xl flex items-center justify-center font-black text-white shadow-lg shadow-indigo-500/20">T</div>
+                <div class="w-9 h-9 bg-gradient-to-tr from-indigo-600 to-indigo-400 rounded-xl flex items-center justify-center font-black text-white shadow-lg">T</div>
                 <div>
-                  <h1 class="font-black text-base tracking-wide text-white">Trade Diary</h1>
-                  <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">PRO SYSTEM</span>
+                  <h1 class="font-black text-base text-white">Trade Diary</h1>
+                  <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">GAURAV PRO SYSTEM</span>
                 </div>
               </div>
 
               <nav class="space-y-1.5">
-                {navItems.map((item) => (
+                {['Dashboard', 'Journal', 'Setups & Rules', 'Mistake Audit'].map((tab) => (
                   <button
-                    key={item.name}
-                    onClick={() => setActiveTab(item.name)}
-                    class={`w-full flex items-center space-x-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all ${
-                      activeTab === item.name
-                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                        : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    class={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-bold transition ${
+                      activeTab === tab ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800/50'
                     }`}
                   >
-                    <span class="text-base">{item.icon}</span>
-                    <span>{item.name}</span>
+                    {tab}
                   </button>
                 ))}
               </nav>
             </div>
 
-            <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80 flex items-center space-x-3">
-              <div class="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-black text-xs border border-indigo-500/30">GD</div>
-              <div class="text-xs overflow-hidden">
-                <p class="font-bold text-white truncate">Gaurav Dhiman</p>
-                <p class="text-[10px] text-emerald-400 font-semibold">● Live Account</p>
+            <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center space-x-3">
+              <div class="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-black text-xs">GD</div>
+              <div class="text-xs">
+                <p class="font-bold text-white">Gaurav Dhiman</p>
+                <p class="text-[10px] text-emerald-400 font-semibold">● Active Trader</p>
               </div>
             </div>
           </aside>
@@ -189,98 +181,75 @@
           {/* Main Area */}
           <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
             
-            {/* Top Bar */}
-            <header class="bg-[#0d1322]/80 backdrop-blur-md border-b border-slate-800/80 px-6 py-3.5 flex items-center justify-between sticky top-0 z-10">
-              <div class="flex items-center space-x-6 text-xs font-mono">
-                <span class="text-slate-400">NIFTY: <span class="text-emerald-400 font-bold">26,042.80 (+0.4%)</span></span>
-                <span class="text-slate-400">BANKNIFTY: <span class="text-rose-400 font-bold">59,011.35 (-0.2%)</span></span>
+            <header class="bg-[#0d1322]/80 border-b border-slate-800 px-6 py-3.5 flex items-center justify-between sticky top-0 z-10">
+              <div class="flex space-x-6 text-xs font-mono">
+                <span class="text-slate-400">NIFTY: <span class="text-emerald-400 font-bold">26,042.80</span></span>
+                <span class="text-slate-400">BANKNIFTY: <span class="text-rose-400 font-bold">59,011.35</span></span>
               </div>
-              <button onClick={() => setShowModal(true)} class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center space-x-2 shadow-lg shadow-indigo-600/30 transition">
-                <span>+ Log New Trade</span>
+              <button onClick={() => setShowModal(true)} class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg">
+                + Log Trade Execution
               </button>
             </header>
 
             <div class="p-6 space-y-6 max-w-7xl mx-auto w-full">
 
-              {/* DASHBOARD TAB */}
               {activeTab === 'Dashboard' && (
                 <div class="space-y-6">
-                  
-                  {/* KPI Cards */}
                   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">HIGHEST P&L</p>
-                      <p class="text-2xl font-black text-emerald-400 mt-1">₹{highestPnl}</p>
-                      <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-emerald-500/5 rounded-full blur-xl"></div>
-                    </div>
-                    <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">WIN RATE</p>
-                      <p class="text-2xl font-black text-indigo-400 mt-1">{winRate}%</p>
-                    </div>
-                    <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">AVG RISK / REWARD</p>
-                      <p class="text-2xl font-black text-purple-400 mt-1">1:2.4</p>
-                    </div>
-                    <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">NET REALIZED P&L</p>
+                    <div class="bg-[#0d1322] border border-slate-800 p-5 rounded-2xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">NET REALIZED P&L</p>
                       <p class={`text-2xl font-black mt-1 ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{totalPnl}</p>
                     </div>
+                    <div class="bg-[#0d1322] border border-slate-800 p-5 rounded-2xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">WIN RATE</p>
+                      <p class="text-2xl font-black text-indigo-400 mt-1">{winRate}%</p>
+                    </div>
+                    <div class="bg-[#0d1322] border border-slate-800 p-5 rounded-2xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">TOTAL EXECUTIONS</p>
+                      <p class="text-2xl font-black text-amber-400 mt-1">{trades.length}</p>
+                    </div>
+                    <div class="bg-[#0d1322] border border-slate-800 p-5 rounded-2xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">FOMO / REVENGE TRADES</p>
+                      <p class="text-2xl font-black text-rose-400 mt-1">{fomoCount}</p>
+                    </div>
                   </div>
 
-                  {/* Confidence Bar */}
-                  <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl space-y-2">
-                    <div class="flex justify-between items-center text-xs">
-                      <span class="font-bold text-slate-300">Execution Confidence Index</span>
-                      <span class="text-indigo-400 font-mono font-bold">{avgConfidence}% Score</span>
-                    </div>
-                    <div class="h-2 w-full bg-slate-900 rounded-full overflow-hidden p-0.5">
-                      <div class="h-full bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-500 rounded-full transition-all duration-500" style={{ width: `${avgConfidence}%` }}></div>
-                    </div>
-                  </div>
-
-                  {/* Charts Grid */}
                   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="lg:col-span-2 bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl h-80 flex flex-col justify-between">
-                      <div class="flex justify-between items-center">
-                        <span class="font-bold text-xs text-slate-200 uppercase tracking-wider">Cumulative Equity Curve</span>
-                        <span class="text-[10px] text-slate-500 font-mono">Realtime Sync</span>
-                      </div>
-                      <div class="h-60 w-full pt-2">
-                        <canvas ref={pnlChartRef}></canvas>
-                      </div>
+                    <div class="lg:col-span-2 bg-[#0d1322] border border-slate-800 p-5 rounded-2xl h-80">
+                      <span class="font-bold text-xs text-slate-200 uppercase">Realized Cumulative Equity Curve</span>
+                      <div class="h-60 w-full pt-2"><canvas ref={pnlChartRef}></canvas></div>
                     </div>
 
-                    <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-2xl h-80 flex flex-col justify-between items-center">
-                      <span class="font-bold text-xs text-slate-200 uppercase tracking-wider w-full text-left">Win / Loss Ratio</span>
-                      <div class="h-48 w-48 relative my-auto">
-                        <canvas ref={winLossChartRef}></canvas>
-                      </div>
+                    <div class="bg-[#0d1322] border border-slate-800 p-5 rounded-2xl h-80 flex flex-col justify-between items-center">
+                      <span class="font-bold text-xs text-slate-200 uppercase w-full text-left">Win / Loss Ratio</span>
+                      <div class="h-44 w-44"><canvas ref={winLossChartRef}></canvas></div>
                       <div class="flex space-x-6 text-xs text-slate-400">
-                        <span class="flex items-center"><span class="w-2.5 h-2.5 bg-emerald-500 rounded-full mr-1.5"></span> Wins ({wins})</span>
-                        <span class="flex items-center"><span class="w-2.5 h-2.5 bg-rose-500 rounded-full mr-1.5"></span> Losses ({trades.length - wins})</span>
+                        <span>Wins ({wins})</span>
+                        <span>Losses ({trades.length - wins})</span>
                       </div>
                     </div>
                   </div>
-
                 </div>
               )}
 
-              {/* TRADES LOG TAB */}
-              {activeTab === 'Trades' && (
-                <div class="bg-[#0d1322] border border-slate-800/80 rounded-2xl overflow-hidden">
-                  <div class="p-4 border-b border-slate-800"><h2 class="font-bold text-sm text-slate-200">Execution Diary Log</h2></div>
+              {activeTab === 'Journal' && (
+                <div class="bg-[#0d1322] border border-slate-800 rounded-2xl overflow-hidden">
+                  <div class="p-4 border-b border-slate-800"><h2 class="font-bold text-sm text-slate-200">Execution & Proof Diary Log</h2></div>
                   <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs text-slate-300">
-                      <thead class="bg-slate-950 text-slate-500 uppercase text-[10px] tracking-wider">
+                      <thead class="bg-slate-950 text-slate-500 uppercase text-[10px]">
                         <tr>
                           <th class="p-3.5">Date</th>
                           <th class="p-3.5">Symbol</th>
-                          <th class="p-3.5">Strategy</th>
+                          <th class="p-3.5">Setup</th>
                           <th class="p-3.5">Type</th>
                           <th class="p-3.5">Qty</th>
-                          <th class="p-3.5">Entry / Exit</th>
+                          <th class="p-3.5">Entry/Exit</th>
+                          <th class="p-3.5">Result</th>
                           <th class="p-3.5">P&L</th>
                           <th class="p-3.5">Mistake</th>
+                          <th class="p-3.5">Chart Link</th>
+                          <th class="p-3.5">Action</th>
                         </tr>
                       </thead>
                       <tbody class="divide-y divide-slate-800/60">
@@ -288,12 +257,17 @@
                           <tr key={t.id} class="hover:bg-slate-800/20">
                             <td class="p-3.5 text-slate-500">{t.date}</td>
                             <td class="p-3.5 font-bold text-white">{t.symbol}</td>
-                            <td class="p-3.5 text-indigo-400 font-semibold">{t.strategy}</td>
+                            <td class="p-3.5 text-indigo-400 font-semibold">{t.setup}</td>
                             <td class={`p-3.5 font-bold ${t.type === 'BUY' ? 'text-emerald-400' : 'text-amber-400'}`}>{t.type}</td>
                             <td class="p-3.5">{t.qty}</td>
                             <td class="p-3.5 font-mono">{t.entry} / {t.exit}</td>
+                            <td class="p-3.5"><span class="bg-slate-900 border border-slate-700 px-2 py-0.5 rounded">{t.resultTag}</span></td>
                             <td class={`p-3.5 font-black text-sm ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{t.pnl}</td>
-                            <td class="p-3.5"><span class={`px-2.5 py-1 rounded-md text-[10px] font-bold ${t.mistake === 'None' ? 'bg-slate-900 text-slate-500' : 'bg-rose-950 text-rose-300 border border-rose-800/60'}`}>{t.mistake}</span></td>
+                            <td class="p-3.5"><span class={`px-2 py-0.5 rounded text-[10px] ${t.mistake === 'None' ? 'bg-slate-900 text-slate-500' : 'bg-rose-950 text-rose-300 border border-rose-800'}`}>{t.mistake}</span></td>
+                            <td class="p-3.5">
+                              {t.chartUrl ? <a href={t.chartUrl} target="_blank" class="text-indigo-400 font-bold underline">Chart</a> : '-'}
+                            </td>
+                            <td class="p-3.5"><button onClick={() => deleteTrade(t.id)} class="text-rose-400 hover:underline">Delete</button></td>
                           </tr>
                         ))}
                       </tbody>
@@ -308,25 +282,39 @@
           {/* Modal */}
           {showModal && (
             <div class="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-              <div class="bg-[#0d1322] border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4">
+              <div class="bg-[#0d1322] border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4">
                 <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <h3 class="font-bold text-sm text-white">Log Trade Execution</h3>
+                  <h3 class="font-bold text-sm text-white">Log Custom Execution</h3>
                   <button onClick={() => setShowModal(false)} class="text-slate-500 hover:text-white">✕</button>
                 </div>
                 <form onSubmit={handleAddTrade} class="space-y-3 text-xs">
-                  <div class="grid grid-cols-2 gap-3">
+                  <div class="grid grid-cols-3 gap-3">
                     <input type="text" placeholder="Symbol (NIFTY)" value={formData.symbol} onChange={e=>setFormData({...formData, symbol: e.target.value.toUpperCase()})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" required />
+                    <select value={formData.setup} onChange={e=>setFormData({...formData, setup: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
+                      {SETUPS.map((s, idx) => <option key={idx} value={s}>{s}</option>)}
+                    </select>
                     <select value={formData.type} onChange={e=>setFormData({...formData, type: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
                       <option value="BUY">BUY</option>
                       <option value="SELL">SELL</option>
                     </select>
                   </div>
-                  <div class="grid grid-cols-3 gap-3">
+                  <div class="grid grid-cols-4 gap-3">
                     <input type="number" placeholder="Qty" value={formData.qty} onChange={e=>setFormData({...formData, qty: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" required />
                     <input type="number" step="any" placeholder="Entry" value={formData.entry} onChange={e=>setFormData({...formData, entry: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" required />
                     <input type="number" step="any" placeholder="Exit" value={formData.exit} onChange={e=>setFormData({...formData, exit: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" required />
+                    <select value={formData.resultTag} onChange={e=>setFormData({...formData, resultTag: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
+                      <option value="Target Hit">Target Hit</option>
+                      <option value="SL Hit">SL Hit</option>
+                      <option value="CTC">CTC</option>
+                    </select>
                   </div>
-                  <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-3 rounded-xl text-white transition shadow-lg shadow-indigo-600/30">Save Trade</button>
+                  <div class="grid grid-cols-2 gap-3">
+                    <select value={formData.mistake} onChange={e=>setFormData({...formData, mistake: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-rose-300">
+                      {MISTAKES.map((m, idx) => <option key={idx} value={m}>{m}</option>)}
+                    </select>
+                    <input type="url" placeholder="TradingView Screenshot URL" value={formData.chartUrl} onChange={e=>setFormData({...formData, chartUrl: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl" />
+                  </div>
+                  <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-3 rounded-xl text-white transition shadow-lg">Save Trade to Custom Diary</button>
                 </form>
               </div>
             </div>
