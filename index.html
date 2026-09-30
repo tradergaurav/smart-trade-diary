@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trade Diary Pro - Ultra Dashboard</title>
+  <title>Trade Diary Pro - Fully Interactive Engine</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -15,14 +15,25 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
+    const CHECKLIST_ITEMS = [
+      "Market Trend Identified (Higher Timeframe)",
+      "Key Support & Resistance Levels Marked",
+      "Risk per Trade Defined (< 2%)",
+      "No Emotional Distraction / Clear Mindset",
+      "Stop Loss & Target Orders Planned",
+      "Waiting Patiently for Setup Trigger"
+    ];
+
     function App() {
       const [activeTab, setActiveTab] = useState('Dashboard');
       const [trades, setTrades] = useState(() => {
-        const saved = localStorage.getItem('trade_diary_premium_v1');
+        const saved = localStorage.getItem('trade_diary_premium_v2');
         return saved ? JSON.parse(saved) : [];
       });
 
+      const [checklist, setChecklist] = useState(() => new Array(CHECKLIST_ITEMS.length).fill(false));
       const [showModal, setShowModal] = useState(false);
+
       const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
         symbol: 'NIFTY',
@@ -30,13 +41,14 @@
         qty: '',
         entry: '',
         exit: '',
-        strategy: 'Breakout',
+        strategy: 'Channel Breakout',
         mistake: 'None',
-        confidence: 75
+        confidence: 80,
+        chartUrl: ''
       });
 
       useEffect(() => {
-        localStorage.setItem('trade_diary_premium_v1', JSON.stringify(trades));
+        localStorage.setItem('trade_diary_premium_v2', JSON.stringify(trades));
       }, [trades]);
 
       const handleAddTrade = (e) => {
@@ -49,8 +61,10 @@
         const newTrade = { id: Date.now(), ...formData, pnl: pnl.toFixed(2) };
         setTrades([newTrade, ...trades]);
         setShowModal(false);
-        setFormData({ date: new Date().toISOString().split('T')[0], symbol: 'NIFTY', type: 'BUY', qty: '', entry: '', exit: '', strategy: 'Breakout', mistake: 'None', confidence: 75 });
+        setFormData({ date: new Date().toISOString().split('T')[0], symbol: 'NIFTY', type: 'BUY', qty: '', entry: '', exit: '', strategy: 'Channel Breakout', mistake: 'None', confidence: 80, chartUrl: '' });
       };
+
+      const deleteTrade = (id) => setTrades(trades.filter(t => t.id !== id));
 
       const totalPnl = trades.reduce((a, b) => a + parseFloat(b.pnl), 0).toFixed(2);
       const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
@@ -64,18 +78,14 @@
         { name: 'Trades', icon: '📈' },
         { name: 'Strategies', icon: '🧩' },
         { name: 'Rules', icon: '📜' },
-        { name: 'Mistakes', icon: '⚠️' },
-        { name: 'Reports', icon: '📉' },
-        { name: 'Risk Management', icon: '🛡️' },
-        { name: 'Paper Trading', icon: '📝' },
-        { name: 'Calendar', icon: '📅' },
+        { name: 'Mistakes', icon: '⚠️' }
       ];
 
       return (
         <div class="flex min-h-screen">
           
           {/* Left Sidebar */}
-          <aside class="w-64 bg-[#0d1322] border-r border-slate-800/80 p-4 flex flex-col justify-between shrink-0 hidden md:flex">
+          <aside class="w-64 bg-[#0d1322] border-r border-slate-800/80 p-4 flex flex-col justify-between shrink-0">
             <div class="space-y-6">
               <div class="flex items-center space-x-2 px-2">
                 <div class="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-white text-sm">T</div>
@@ -104,7 +114,7 @@
               <div class="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">GD</div>
               <div class="text-xs overflow-hidden">
                 <p class="font-bold text-white truncate">Gaurav Dhiman</p>
-                <p class="text-[10px] text-slate-500 truncate">Pro Account</p>
+                <p class="text-[10px] text-slate-500 truncate">Pro Trader</p>
               </div>
             </div>
           </aside>
@@ -113,144 +123,181 @@
           <main class="flex-1 flex flex-col min-w-0 bg-[#0a0e17]">
             
             {/* Top Market Ticker Bar */}
-            <div class="bg-[#0f172a]/90 border-b border-slate-800/80 px-4 py-2 flex items-center justify-between text-[11px] overflow-x-auto whitespace-nowrap scrollbar-none">
+            <div class="bg-[#0f172a]/90 border-b border-slate-800/80 px-4 py-2 flex items-center justify-between text-[11px]">
               <div class="flex items-center space-x-6 font-mono">
                 <span>Nifty Media: <span class="text-emerald-400 font-bold">+2.53%</span></span>
                 <span>Nifty Metal: <span class="text-rose-400 font-bold">-1.56%</span></span>
-                <span>Nifty Pharma: <span class="text-rose-400 font-bold">-1.88%</span></span>
-                <span>Nifty Pvt Bank: <span class="text-emerald-400 font-bold">+0.95%</span></span>
-                <span>Nifty PSU Bank: <span class="text-emerald-400 font-bold">+0.54%</span></span>
+                <span>Nifty Bank: <span class="text-emerald-400 font-bold">+0.95%</span></span>
               </div>
-              <div class="flex items-center space-x-3 shrink-0 ml-4">
-                <button class="bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md text-[10px] text-slate-300">Last 30 Days ▾</button>
-                <button onClick={() => setShowModal(true)} class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-md font-bold text-xs flex items-center space-x-1 shadow-md shadow-indigo-600/30">
-                  <span>+</span>
-                  <span>New Trade</span>
-                </button>
-              </div>
+              <button onClick={() => setShowModal(true)} class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-md font-bold text-xs flex items-center space-x-1 shadow-md shadow-indigo-600/30">
+                <span>+</span>
+                <span>New Trade</span>
+              </button>
             </div>
 
-            {/* Main Dashboard Grid */}
-            <div class="p-6 space-y-6 overflow-y-auto">
-              
-              {/* Top Banner Notice */}
-              <div class="bg-indigo-950/30 border border-indigo-800/40 p-3.5 rounded-xl flex items-center justify-between text-xs">
-                <div class="flex items-center space-x-3">
-                  <span class="text-indigo-400">🔔</span>
-                  <div>
-                    <p class="font-bold text-indigo-200">Stay on Track with Your Trading Journal</p>
-                    <p class="text-[11px] text-indigo-300/70">Get timely reminders to keep your journal up to date and never miss a trade analysis.</p>
-                  </div>
-                </div>
-                <button class="bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs font-bold shrink-0">Enable</button>
-              </div>
+            <div class="p-6 overflow-y-auto">
 
-              {/* 4 Top KPI Cards */}
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl">
-                  <p class="text-[11px] uppercase font-bold tracking-wider text-slate-500">HIGHEST P&L</p>
-                  <p class="text-xl font-extrabold text-emerald-400 mt-1">₹{highestPnl}</p>
-                  <p class="text-[10px] text-emerald-500/80 mt-1">0% vs last 30 days</p>
-                </div>
-                <div class="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl">
-                  <p class="text-[11px] uppercase font-bold tracking-wider text-slate-500">WIN RATE</p>
-                  <p class="text-xl font-extrabold text-indigo-400 mt-1">{winRate}%</p>
-                  <p class="text-[10px] text-slate-500 mt-1">0% vs last 30 days</p>
-                </div>
-                <div class="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl">
-                  <p class="text-[11px] uppercase font-bold tracking-wider text-slate-500">AVG. RISK/REWARD</p>
-                  <p class="text-xl font-extrabold text-purple-400 mt-1">1:2</p>
-                  <p class="text-[10px] text-slate-500 mt-1">0% vs last 30 days</p>
-                </div>
-                <div class="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl">
-                  <p class="text-[11px] uppercase font-bold tracking-wider text-slate-500">TRADES THIS MONTH</p>
-                  <p class="text-xl font-extrabold text-amber-400 mt-1">{trades.length}</p>
-                  <p class="text-[10px] text-slate-500 mt-1">0 vs last 30 days</p>
-                </div>
-              </div>
-
-              {/* Confidence Index Gauge */}
-              <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-xl space-y-3">
-                <div class="flex justify-between items-center text-xs">
-                  <span class="font-bold text-slate-300">Confidence Index</span>
-                  <span class="text-indigo-400 font-mono font-bold">{avgConfidence}% Score</span>
-                </div>
-                <div class="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden p-0.5 relative">
-                  <div class="h-full bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-500 rounded-full" style={{ width: `${avgConfidence}%` }}></div>
-                </div>
-                <div class="flex justify-between text-[10px] text-slate-500 font-semibold">
-                  <span>Low</span>
-                  <span>High</span>
-                </div>
-              </div>
-
-              {/* Middle Section: Cumulative P&L & Top Trades */}
-              <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 bg-[#0d1322] border border-slate-800/80 p-5 rounded-xl flex flex-col justify-between h-64">
-                  <div class="flex justify-between items-center">
-                    <span class="font-bold text-sm text-slate-200">Cumulative P&L</span>
-                    <div class="flex space-x-1 text-[10px] bg-slate-900 p-1 rounded-md border border-slate-800">
-                      <button class="px-2 py-0.5 bg-indigo-600 rounded text-white font-bold">D</button>
-                      <button class="px-2 py-0.5 text-slate-400">W</button>
-                      <button class="px-2 py-0.5 text-slate-400">M</button>
+              {/* 1. DASHBOARD VIEW */}
+              {activeTab === 'Dashboard' && (
+                <div class="space-y-6">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[11px] font-bold text-slate-500 uppercase">HIGHEST P&L</p>
+                      <p class="text-xl font-extrabold text-emerald-400 mt-1">₹{highestPnl}</p>
+                    </div>
+                    <div class="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[11px] font-bold text-slate-500 uppercase">WIN RATE</p>
+                      <p class="text-xl font-extrabold text-indigo-400 mt-1">{winRate}%</p>
+                    </div>
+                    <div class="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[11px] font-bold text-slate-500 uppercase">CONFIDENCE INDEX</p>
+                      <p class="text-xl font-extrabold text-purple-400 mt-1">{avgConfidence}%</p>
+                    </div>
+                    <div class="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[11px] font-bold text-slate-500 uppercase">NET P&L</p>
+                      <p class={`text-xl font-extrabold mt-1 ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{totalPnl}</p>
                     </div>
                   </div>
-                  <div class="flex-1 flex flex-col items-center justify-center text-center">
-                    <p class={`text-3xl font-extrabold ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{totalPnl}</p>
-                    <p class="text-xs text-slate-500 mt-1">Realized Net Equity Curve</p>
-                  </div>
-                </div>
 
-                <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-xl flex flex-col justify-between h-64">
-                  <span class="font-bold text-sm text-slate-200">Top Trades</span>
-                  <div class="flex-1 flex flex-col items-center justify-center text-slate-500 text-xs">
-                    {trades.length === 0 ? "No top trades yet" : (
-                      <div class="w-full space-y-2 overflow-y-auto max-h-40">
-                        {trades.slice(0, 3).map(t => (
-                          <div key={t.id} class="flex justify-between p-2 bg-slate-900/50 rounded border border-slate-800/60">
-                            <span class="font-bold text-white">{t.symbol}</span>
-                            <span class={t.pnl >= 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>₹{t.pnl}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-xl flex flex-col items-center justify-center h-64">
+                    <span class="text-slate-500 text-xs font-bold uppercase mb-2">Cumulative Realized P&L</span>
+                    <p class={`text-4xl font-black ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{totalPnl}</p>
+                    <p class="text-xs text-slate-500 mt-2">{trades.length} Total Executed Trades Logged</p>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Bottom Analytics Grid */}
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-xl h-48 flex flex-col justify-between">
-                  <span class="font-bold text-sm text-slate-200">Win/Loss Distribution</span>
-                  <div class="flex items-center justify-center space-x-6 text-xs">
-                    <div class="text-center">
-                      <p class="text-emerald-400 text-xl font-bold">{wins}</p>
-                      <p class="text-slate-500">Wins</p>
-                    </div>
-                    <div class="text-center">
-                      <p class="text-rose-400 text-xl font-bold">{trades.length - wins}</p>
-                      <p class="text-slate-500">Losses</p>
-                    </div>
+              {/* 2. TRADING CHECKLIST VIEW */}
+              {activeTab === 'Trading Checklist' && (
+                <div class="bg-[#0d1322] border border-slate-800/80 p-6 rounded-2xl space-y-4 max-w-2xl mx-auto">
+                  <h2 class="text-base font-bold text-indigo-400 border-b border-slate-800 pb-2">Pre-Market Execution Checklist</h2>
+                  <p class="text-xs text-slate-400">Complete these checks before taking any trade to maintain strict discipline.</p>
+                  <div class="space-y-3 pt-2">
+                    {CHECKLIST_ITEMS.map((item, idx) => (
+                      <label key={idx} class="flex items-center space-x-3 p-3 bg-slate-900/60 rounded-xl border border-slate-800 cursor-pointer text-xs">
+                        <input
+                          type="checkbox"
+                          checked={checklist[idx]}
+                          onChange={() => {
+                            const updated = [...checklist];
+                            updated[idx] = !updated[idx];
+                            setChecklist(updated);
+                          }}
+                          class="accent-indigo-500 w-4 h-4"
+                        />
+                        <span class={checklist[idx] ? 'line-through text-slate-500' : 'text-slate-200'}>{item}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
+              )}
 
-                <div class="bg-[#0d1322] border border-slate-800/80 p-5 rounded-xl h-48 flex flex-col justify-between">
-                  <span class="font-bold text-sm text-slate-200">Most Common Mistakes</span>
-                  <div class="text-center text-xs text-slate-500 my-auto">
-                    {trades.filter(t => t.mistake !== 'None').length === 0 ? "No mistakes found! Keep up the discipline." : `${trades.filter(t => t.mistake !== 'None').length} Violation(s) Logged`}
+              {/* 3. TRADES LOG VIEW */}
+              {activeTab === 'Trades' && (
+                <div class="bg-[#0d1322] border border-slate-800/80 rounded-2xl overflow-hidden">
+                  <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                    <h2 class="font-bold text-sm text-slate-200">Trade Execution Diary</h2>
+                  </div>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-300">
+                      <thead class="bg-slate-950 text-slate-400 uppercase">
+                        <tr>
+                          <th class="p-3">Date</th>
+                          <th class="p-3">Symbol</th>
+                          <th class="p-3">Strategy</th>
+                          <th class="p-3">Type</th>
+                          <th class="p-3">Qty</th>
+                          <th class="p-3">Entry / Exit</th>
+                          <th class="p-3">P&L</th>
+                          <th class="p-3">Mistake</th>
+                          <th class="p-3">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trades.length === 0 ? (
+                          <tr><td colSpan="9" class="p-6 text-center text-slate-500">No trades logged yet. Click "+ New Trade" to start.</td></tr>
+                        ) : (
+                          trades.map(t => (
+                            <tr key={t.id} class="border-b border-slate-800/60 hover:bg-slate-800/30">
+                              <td class="p-3 text-slate-500">{t.date}</td>
+                              <td class="p-3 font-bold text-white">{t.symbol}</td>
+                              <td class="p-3 text-indigo-400">{t.strategy}</td>
+                              <td class={`p-3 font-bold ${t.type === 'BUY' ? 'text-emerald-400' : 'text-amber-400'}`}>{t.type}</td>
+                              <td class="p-3">{t.qty}</td>
+                              <td class="p-3">{t.entry} / {t.exit}</td>
+                              <td class={`p-3 font-bold ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{t.pnl}</td>
+                              <td class="p-3"><span class={`px-2 py-0.5 rounded text-[10px] ${t.mistake === 'None' ? 'bg-slate-900 text-slate-500' : 'bg-rose-950 text-rose-300 border border-rose-800'}`}>{t.mistake}</span></td>
+                              <td class="p-3"><button onClick={() => deleteTrade(t.id)} class="text-rose-400 hover:underline">Delete</button></td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* 4. STRATEGIES VIEW */}
+              {activeTab === 'Strategies' && (
+                <div class="bg-[#0d1322] border border-slate-800/80 p-6 rounded-2xl space-y-4">
+                  <h2 class="text-sm font-bold text-slate-200">Strategy Performance Analysis</h2>
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {["Channel Breakout", "Fibo Level", "W / M Pattern", "Range Break"].map((strat, i) => {
+                      const stratTrades = trades.filter(t => t.strategy === strat);
+                      const stratPnl = stratTrades.reduce((a, b) => a + parseFloat(b.pnl), 0).toFixed(2);
+                      return (
+                        <div key={i} class="bg-slate-900/60 border border-slate-800 p-4 rounded-xl">
+                          <p class="font-bold text-xs text-indigo-300">{strat}</p>
+                          <p class="text-xs text-slate-500 mt-1">Trades: {stratTrades.length}</p>
+                          <p class={`text-lg font-bold mt-2 ${stratPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{stratPnl}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 5. RULES VIEW */}
+              {activeTab === 'Rules' && (
+                <div class="bg-[#0d1322] border border-slate-800/80 p-6 rounded-2xl space-y-4 max-w-2xl">
+                  <h2 class="text-sm font-bold text-slate-200">Personal Trading System Rules</h2>
+                  <ul class="space-y-3 text-xs text-slate-300 list-disc pl-5">
+                    <li>Never take more than 2 trades per day.</li>
+                    <li>Always place Stop Loss in the system, never in mind.</li>
+                    <li>No trading after 2 consecutive losses.</li>
+                    <li>Do not enter based on Telegram tips or social media reels.</li>
+                  </ul>
+                </div>
+              )}
+
+              {/* 6. MISTAKES TRACKER VIEW */}
+              {activeTab === 'Mistakes' && (
+                <div class="bg-[#0d1322] border border-slate-800/80 p-6 rounded-2xl space-y-4">
+                  <h2 class="text-sm font-bold text-rose-400">Psychological Mistakes Breakdown</h2>
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {["FOMO", "Revenge", "No SL", "Over-leveraging"].map((m, i) => {
+                      const count = trades.filter(t => t.mistake.includes(m)).length;
+                      return (
+                        <div key={i} class="bg-slate-900/60 border border-slate-800 p-4 rounded-xl text-center">
+                          <p class="text-xs text-slate-400">{m}</p>
+                          <p class="text-2xl font-black text-rose-400 mt-1">{count}</p>
+                          <p class="text-[10px] text-slate-500 mt-1">Occurrences</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
             </div>
           </main>
 
-          {/* Modal For New Trade Entry */}
+          {/* New Trade Modal */}
           {showModal && (
             <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
               <div class="bg-[#0d1322] border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4">
                 <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <h3 class="font-bold text-sm text-white">Log New Trade Execution</h3>
+                  <h3 class="font-bold text-sm text-white">Log New Execution</h3>
                   <button onClick={() => setShowModal(false)} class="text-slate-400 hover:text-white">✕</button>
                 </div>
                 <form onSubmit={handleAddTrade} class="space-y-3 text-xs">
@@ -267,19 +314,20 @@
                     <input type="number" step="any" placeholder="Exit" value={formData.exit} onChange={e=>setFormData({...formData, exit: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-lg" required />
                   </div>
                   <div class="grid grid-cols-2 gap-3">
-                    <input type="text" placeholder="Strategy Tag" value={formData.strategy} onChange={e=>setFormData({...formData, strategy: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-lg" />
+                    <select value={formData.strategy} onChange={e=>setFormData({...formData, strategy: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-lg text-indigo-300">
+                      <option value="Channel Breakout">Channel Breakout</option>
+                      <option value="Fibo Level">Fibo Level</option>
+                      <option value="W / M Pattern">W / M Pattern</option>
+                      <option value="Range Break">Range Break</option>
+                    </select>
                     <select value={formData.mistake} onChange={e=>setFormData({...formData, mistake: e.target.value})} class="bg-slate-900 border border-slate-800 p-2.5 rounded-lg text-rose-300">
                       <option value="None">No Mistake</option>
-                      <option value="FOMO">FOMO Entry</option>
-                      <option value="Revenge">Revenge Trade</option>
+                      <option value="FOMO Entry">FOMO Entry</option>
+                      <option value="Revenge Trade">Revenge Trade</option>
                       <option value="No SL">No Stop Loss</option>
                     </select>
                   </div>
-                  <div>
-                    <label class="block text-slate-400 mb-1">Pre-trade Confidence: {formData.confidence}%</label>
-                    <input type="range" min="0" max="100" value={formData.confidence} onChange={e=>setFormData({...formData, confidence: e.target.value})} class="w-full accent-indigo-500" />
-                  </div>
-                  <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2.5 rounded-xl text-white transition">Save Trade</button>
+                  <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2.5 rounded-xl text-white transition">Save Execution</button>
                 </form>
               </div>
             </div>
