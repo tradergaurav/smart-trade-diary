@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Trade Diary</title>
+  <title>Smart Trade Diary - Full Suite</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -15,9 +15,16 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
+    const MINDSET_PARAMS = [
+      "Rule Followed", "Patience Maintained", "Risk Managed (SL Set)",
+      "No Revenge Trade", "Pre-planned Entry", "No Early Exit",
+      "Correct Position Size", "Strict Discipline", "Setup Followed",
+      "Emotional Control", "Market Acceptance", "Post-Trade Logged"
+    ];
+
     function App() {
       const [trades, setTrades] = useState(() => {
-        const saved = localStorage.getItem('smart_trades');
+        const saved = localStorage.getItem('smart_trades_v2');
         return saved ? JSON.parse(saved) : [];
       });
 
@@ -26,155 +33,212 @@
         type: 'BUY',
         entry: '',
         exit: '',
+        sl: '',
+        target: '',
         qty: '',
-        mindsetScore: 8,
+        emotion: 'Neutral',
+        resultTag: 'Target Hit',
+        mindsetChecks: new Array(12).fill(true),
         notes: ''
       });
 
       useEffect(() => {
-        localStorage.setItem('smart_trades', JSON.stringify(trades));
+        localStorage.setItem('smart_trades_v2', JSON.stringify(trades));
       }, [trades]);
+
+      const handleMindsetToggle = (index) => {
+        const updated = [...formData.mindsetChecks];
+        updated[index] = !updated[index];
+        setFormData({ ...formData, mindsetChecks: updated });
+      };
 
       const handleSubmit = (e) => {
         e.preventDefault();
         if (!formData.symbol || !formData.entry || !formData.exit || !formData.qty) return;
 
-        const pnl = (parseFloat(formData.exit) - parseFloat(formData.entry)) * parseFloat(formData.qty) * (formData.type === 'BUY' ? 1 : -1);
-        
+        const entryPrice = parseFloat(formData.entry);
+        const exitPrice = parseFloat(formData.exit);
+        const slPrice = parseFloat(formData.sl) || entryPrice;
+        const targetPrice = parseFloat(formData.target) || entryPrice;
+        const qty = parseFloat(formData.qty);
+        const isBuy = formData.type === 'BUY';
+
+        const pnl = (exitPrice - entryPrice) * qty * (isBuy ? 1 : -1);
+        const risk = Math.abs(entryPrice - slPrice);
+        const reward = Math.abs(targetPrice - entryPrice);
+        const rrRatio = risk > 0 ? (reward / risk).toFixed(2) : '1:1';
+
+        const score = formData.mindsetChecks.filter(Boolean).length;
+
         const newTrade = {
           id: Date.now(),
           ...formData,
           pnl: pnl.toFixed(2),
+          rrRatio,
+          score,
           date: new Date().toLocaleDateString()
         };
 
         setTrades([newTrade, ...trades]);
-        setFormData({ symbol: '', type: 'BUY', entry: '', exit: '', qty: '', mindsetScore: 8, notes: '' });
+        setFormData({
+          symbol: '', type: 'BUY', entry: '', exit: '', sl: '', target: '', qty: '',
+          emotion: 'Neutral', resultTag: 'Target Hit', mindsetChecks: new Array(12).fill(true), notes: ''
+        });
+      };
+
+      const deleteTrade = (id) => {
+        setTrades(trades.filter(t => t.id !== id));
       };
 
       const totalPnl = trades.reduce((acc, t) => acc + parseFloat(t.pnl), 0).toFixed(2);
       const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
       const winRate = trades.length ? ((wins / trades.length) * 100).toFixed(1) : 0;
+      const avgScore = trades.length ? (trades.reduce((a, b) => a + b.score, 0) / trades.length).toFixed(1) : 0;
 
       return (
-        <div class="max-w-6xl mx-auto p-4 md:p-8">
-          {/* Header */}
-          <div class="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
+        <div class="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
+          {/* Top Bar */}
+          <div class="flex justify-between items-center border-b border-slate-800 pb-4">
             <div>
               <h1 class="text-2xl md:text-3xl font-bold text-emerald-400">Smart Trade Diary</h1>
-              <p class="text-xs md:text-sm text-slate-400">Psychology & Performance Tracker</p>
+              <p class="text-xs text-slate-400">Psychology, Execution & Risk Engine</p>
             </div>
             <div class="text-right">
-              <span class="text-xs text-slate-400">Net P&L</span>
-              <p class={`text-xl font-bold ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                ${totalPnl}
+              <span class="text-xs text-slate-400">Net Realized P&L</span>
+              <p class={`text-2xl font-black ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                ₹{totalPnl}
               </p>
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div class="grid grid-cols-3 gap-4 mb-8">
-            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-              <p class="text-xs text-slate-400">Total Trades</p>
-              <p class="text-xl font-bold text-slate-200">{trades.length}</p>
+          {/* Stats Bar */}
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
+              <p class="text-xs text-slate-400">Total Executed Trades</p>
+              <p class="text-2xl font-bold text-slate-200">{trades.length}</p>
             </div>
-            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+            <div class="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
               <p class="text-xs text-slate-400">Win Rate</p>
-              <p class="text-xl font-bold text-indigo-400">{winRate}%</p>
+              <p class="text-2xl font-bold text-indigo-400">{winRate}%</p>
             </div>
-            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-              <p class="text-xs text-slate-400">Avg Mindset</p>
-              <p class="text-xl font-bold text-amber-400">
-                {trades.length ? (trades.reduce((a,b) => a + Number(b.mindsetScore), 0) / trades.length).toFixed(1) : 'N/A'}/10
+            <div class="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
+              <p class="text-xs text-slate-400">Avg Mindset Score</p>
+              <p class="text-2xl font-bold text-amber-400">{avgScore} / 12</p>
+            </div>
+            <div class="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
+              <p class="text-xs text-slate-400">Disciplined Trades</p>
+              <p class="text-2xl font-bold text-emerald-400">
+                {trades.filter(t => t.score >= 10).length}
               </p>
             </div>
           </div>
 
-          {/* Trade Form */}
-          <form onSubmit={handleSubmit} class="bg-slate-800/40 p-6 rounded-2xl border border-slate-700/60 mb-8 space-y-4">
-            <h2 class="text-lg font-semibold text-slate-200">Log New Trade</h2>
+          {/* Form */}
+          <form onSubmit={handleSubmit} class="bg-slate-800/30 p-6 rounded-2xl border border-slate-700/50 space-y-6">
+            <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700/50 pb-2">Log Detailed Trade & Mindset</h2>
+            
+            {/* Price Inputs */}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <input 
-                type="text" placeholder="Symbol (e.g. NIFTY)" 
-                value={formData.symbol} onChange={e => setFormData({...formData, symbol: e.target.value.toUpperCase()})}
-                class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm focus:outline-none focus:border-emerald-500" required 
-              />
-              <select 
-                value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}
-                class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
-              >
+              <input type="text" placeholder="Symbol (e.g. NIFTY)" value={formData.symbol} onChange={e=>setFormData({...formData, symbol: e.target.value.toUpperCase()})} class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm" required />
+              <select value={formData.type} onChange={e=>setFormData({...formData, type: e.target.value})} class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm">
                 <option value="BUY">BUY</option>
                 <option value="SELL">SELL</option>
               </select>
-              <input 
-                type="number" step="any" placeholder="Entry Price" 
-                value={formData.entry} onChange={e => setFormData({...formData, entry: e.target.value})}
-                class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm focus:outline-none focus:border-emerald-500" required 
-              />
-              <input 
-                type="number" step="any" placeholder="Exit Price" 
-                value={formData.exit} onChange={e => setFormData({...formData, exit: e.target.value})}
-                class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm focus:outline-none focus:border-emerald-500" required 
-              />
-              <input 
-                type="number" placeholder="Quantity" 
-                value={formData.qty} onChange={e => setFormData({...formData, qty: e.target.value})}
-                class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm focus:outline-none focus:border-emerald-500" required 
-              />
-              <div class="col-span-1">
-                <label class="text-xs text-slate-400 block mb-1">Mindset Score: {formData.mindsetScore}/10</label>
-                <input 
-                  type="range" min="1" max="10" 
-                  value={formData.mindsetScore} onChange={e => setFormData({...formData, mindsetScore: e.target.value})}
-                  class="w-full accent-emerald-500" 
-                />
-              </div>
-              <input 
-                type="text" placeholder="Notes / Mistakes" 
-                value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})}
-                class="col-span-2 bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm focus:outline-none focus:border-emerald-500" 
-              />
+              <input type="number" step="any" placeholder="Entry Price" value={formData.entry} onChange={e=>setFormData({...formData, entry: e.target.value})} class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm" required />
+              <input type="number" step="any" placeholder="Exit Price" value={formData.exit} onChange={e=>setFormData({...formData, exit: e.target.value})} class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm" required />
+              <input type="number" step="any" placeholder="Stop Loss (SL)" value={formData.sl} onChange={e=>setFormData({...formData, sl: e.target.value})} class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm" />
+              <input type="number" step="any" placeholder="Target Price" value={formData.target} onChange={e=>setFormData({...formData, target: e.target.value})} class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm" />
+              <input type="number" placeholder="Quantity" value={formData.qty} onChange={e=>setFormData({...formData, qty: e.target.value})} class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm" required />
+              <select value={formData.resultTag} onChange={e=>setFormData({...formData, resultTag: e.target.value})} class="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm">
+                <option value="Target Hit">Target Hit</option>
+                <option value="SL Hit">SL Hit</option>
+                <option value="Cost To Cost (CTC)">Cost To Cost (CTC)</option>
+                <option value="Manual Exit">Manual Exit</option>
+              </select>
             </div>
-            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-lg transition">
-              Save Trade
+
+            {/* Emotion & Notes */}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="text-xs text-slate-400 block mb-1">Emotion During Trade</label>
+                <select value={formData.emotion} onChange={e=>setFormData({...formData, emotion: e.target.value})} class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm">
+                  <option value="Neutral">Neutral / Calm</option>
+                  <option value="FOMO">FOMO (Fear Of Missing Out)</option>
+                  <option value="Revenge">Revenge Trading</option>
+                  <option value="Fear">Fear / Hesitation</option>
+                  <option value="Overconfidence">Overconfidence</option>
+                  <option value="Patient">Patient Execution</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-slate-400 block mb-1">Key Lessons & Notes</label>
+                <input type="text" placeholder="What went well or what was wrong?" value={formData.notes} onChange={e=>setFormData({...formData, notes: e.target.value})} class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm" />
+              </div>
+            </div>
+
+            {/* 12-Parameter Mindset Score Checklist */}
+            <div>
+              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">12-Parameter Mindset & Psychology Evaluation</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {MINDSET_PARAMS.map((param, idx) => (
+                  <label key={idx} class={`flex items-center space-x-2 text-xs p-2 rounded-lg cursor-pointer border ${formData.mindsetChecks[idx] ? 'bg-emerald-950/40 border-emerald-600/50 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                    <input type="checkbox" checked={formData.mindsetChecks[idx]} onChange={()=>handleMindsetToggle(idx)} class="accent-emerald-500" />
+                    <span>{param}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-3 rounded-xl transition">
+              Log Trade to Diary
             </button>
           </form>
 
-          {/* Trade History */}
+          {/* Table */}
           <div class="bg-slate-800/40 rounded-2xl border border-slate-700/60 overflow-hidden">
             <div class="p-4 border-b border-slate-700/60">
-              <h2 class="text-lg font-semibold text-slate-200">Trade History</h2>
+              <h2 class="text-lg font-semibold text-slate-200">Trade History & Discipline Audit</h2>
             </div>
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm text-slate-300">
-                <thead class="bg-slate-900/50 text-xs text-slate-400 uppercase">
+                <thead class="bg-slate-900/60 text-xs text-slate-400 uppercase">
                   <tr>
                     <th class="p-3">Date</th>
                     <th class="p-3">Symbol</th>
                     <th class="p-3">Type</th>
                     <th class="p-3">Qty</th>
-                    <th class="p-3">Entry</th>
-                    <th class="p-3">Exit</th>
+                    <th class="p-3">Entry / Exit</th>
+                    <th class="p-3">SL / Target</th>
+                    <th class="p-3">R:R</th>
+                    <th class="p-3">Result</th>
+                    <th class="p-3">Emotion</th>
                     <th class="p-3">P&L</th>
-                    <th class="p-3">Mindset</th>
+                    <th class="p-3">Score</th>
+                    <th class="p-3">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {trades.length === 0 ? (
                     <tr>
-                      <td colSpan="8" class="p-4 text-center text-slate-500">No trades logged yet.</td>
+                      <td colSpan="12" class="p-6 text-center text-slate-500">No trades logged yet. Start recording your journey!</td>
                     </tr>
                   ) : (
                     trades.map(t => (
-                      <tr key={t.id} class="border-b border-slate-800 hover:bg-slate-800/30">
-                        <td class="p-3 text-xs text-slate-400">{t.date}</td>
-                        <td class="p-3 font-semibold">{t.symbol}</td>
-                        <td class={`p-3 text-xs font-bold ${t.type === 'BUY' ? 'text-emerald-400' : 'text-amber-400'}`}>{t.type}</td>
+                      <tr key={t.id} class="border-b border-slate-800/60 hover:bg-slate-800/30 text-xs">
+                        <td class="p-3 text-slate-400">{t.date}</td>
+                        <td class="p-3 font-bold text-slate-100">{t.symbol}</td>
+                        <td class={`p-3 font-bold ${t.type === 'BUY' ? 'text-emerald-400' : 'text-amber-400'}`}>{t.type}</td>
                         <td class="p-3">{t.qty}</td>
-                        <td class="p-3">{t.entry}</td>
-                        <td class="p-3">{t.exit}</td>
-                        <td class={`p-3 font-bold ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>${t.pnl}</td>
-                        <td class="p-3">{t.mindsetScore}/10</td>
+                        <td class="p-3">{t.entry} / {t.exit}</td>
+                        <td class="p-3 text-slate-400">{t.sl || '-'} / {t.target || '-'}</td>
+                        <td class="p-3 font-mono">{t.rrRatio}</td>
+                        <td class="p-3"><span class="bg-slate-900 px-2 py-1 rounded text-slate-300 border border-slate-700">{t.resultTag}</span></td>
+                        <td class="p-3"><span class="text-amber-300">{t.emotion}</span></td>
+                        <td class={`p-3 font-black text-sm ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{t.pnl}</td>
+                        <td class="p-3 font-bold text-indigo-400">{t.score}/12</td>
+                        <td class="p-3">
+                          <button onClick={()=>deleteTrade(t.id)} class="text-rose-400 hover:text-rose-300 font-bold">Delete</button>
+                        </td>
                       </tr>
                     ))
                   )}
