@@ -3,6 +3,488 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trade Diary - Premium Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-[#090d16] text-slate-200 antialiased font-sans min-h-screen selection:bg-indigo-600 selection:text-white">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const SETUPS = ["Channel Breakout", "Range Break", "Inside Candle", "Fibo Level", "W / M Pattern", "Cup & Handle"];
+    const MISTAKES = ["FOMO Entry", "Revenge Trade", "Tip / Social Media Entry", "Distraction / Reel Watching", "No Stop Loss", "Early Exit"];
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('Dashboard');
+      const [trades, setTrades] = useState(() => {
+        const saved = localStorage.getItem('tradediary_premium_v9');
+        return saved ? JSON.parse(saved) : [
+          { id: 1, date: '2026-09-28', symbol: 'NIFTY', type: 'BUY', qty: 50, entry: 25800, exit: 25950, pnl: '7500.00', strategy: 'Channel Breakout', mistake: 'None', confidence: 85, chartUrl: '' },
+          { id: 2, date: '2026-09-29', symbol: 'BANKNIFTY', type: 'SELL', qty: 30, entry: 58500, exit: 58800, pnl: '-9000.00', strategy: 'Range Break', mistake: 'FOMO Entry', confidence: 40, chartUrl: '' },
+          { id: 3, date: '2026-09-30', symbol: 'NIFTY', type: 'BUY', qty: 100, entry: 25900, exit: 26040, pnl: '14000.00', strategy: 'Fibo Level', mistake: 'None', confidence: 90, chartUrl: '' }
+        ];
+      });
+
+      const [showModal, setShowModal] = useState(false);
+      const [formData, setFormData] = useState({
+        date: new Date().toISOString().split('T')[0],
+        symbol: 'NIFTY',
+        type: 'BUY',
+        qty: '',
+        entry: '',
+        exit: '',
+        strategy: 'Channel Breakout',
+        mistake: 'None',
+        confidence: 80,
+        chartUrl: ''
+      });
+
+      const pnlChartRef = useRef(null);
+      const winLossChartRef = useRef(null);
+
+      useEffect(() => {
+        localStorage.setItem('tradediary_premium_v9', JSON.stringify(trades));
+      }, [trades]);
+
+      // Render Dashboard Charts
+      useEffect(() => {
+        if (activeTab !== 'Dashboard') return;
+
+        // Cumulative Equity Curve
+        if (pnlChartRef.current) {
+          const ctx = pnlChartRef.current.getContext('2d');
+          let cumPnl = 0;
+          const labels = trades.map(t => t.date);
+          const data = trades.map(t => {
+            cumPnl += parseFloat(t.pnl);
+            return cumPnl;
+          });
+
+          if (window.myPnlChart) window.myPnlChart.destroy();
+          window.myPnlChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: labels.length ? labels : ['Day 1'],
+              datasets: [{
+                label: 'Cumulative P&L',
+                data: data.length ? data : [0],
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                fill: true,
+                tension: 0.35,
+                borderWidth: 2,
+                pointRadius: 3,
+                pointBackgroundColor: '#60a5fa'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#475569', font: { size: 10 } } },
+                y: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#475569', font: { size: 10 } } }
+              }
+            }
+          });
+        }
+
+        // Win/Loss Donut
+        if (winLossChartRef.current) {
+          const ctx = winLossChartRef.current.getContext('2d');
+          const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
+          const losses = trades.filter(t => parseFloat(t.pnl) <= 0).length;
+
+          if (window.myWinLossChart) window.myWinLossChart.destroy();
+          window.myWinLossChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+              labels: ['Wins', 'Losses'],
+              datasets: [{
+                data: trades.length ? [wins, losses] : [0, 1],
+                backgroundColor: ['#10b981', '#ef4444'],
+                borderWidth: 0
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              cutout: '80%'
+            }
+          });
+        }
+      }, [activeTab, trades]);
+
+      const handleAddTrade = (e) => {
+        e.preventDefault();
+        const entry = parseFloat(formData.entry);
+        const exit = parseFloat(formData.exit);
+        const qty = parseFloat(formData.qty);
+        const pnl = (exit - entry) * qty * (formData.type === 'BUY' ? 1 : -1);
+
+        const newTrade = { id: Date.now(), ...formData, pnl: pnl.toFixed(2) };
+        setTrades([...trades, newTrade]);
+        setShowModal(false);
+      };
+
+      const deleteTrade = (id) => setTrades(trades.filter(t => t.id !== id));
+
+      const totalPnl = trades.reduce((a, b) => a + parseFloat(b.pnl), 0).toFixed(2);
+      const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
+      const winRate = trades.length ? ((wins / trades.length) * 100).toFixed(0) : 0;
+      const highestPnl = trades.length ? Math.max(...trades.map(t => parseFloat(t.pnl))).toFixed(2) : '0.00';
+      const avgConfidence = trades.length ? (trades.reduce((a, b) => a + Number(b.confidence), 0) / trades.length).toFixed(0) : 50;
+
+      const navItems = [
+        { name: 'Dashboard', icon: '📊' },
+        { name: 'Trading Checklist', icon: '✅' },
+        { name: 'Trades', icon: '📈' },
+        { name: 'Strategies', icon: '🧩' },
+        { name: 'Rules', icon: '📜' },
+        { name: 'Mistakes', icon: '⚠️' },
+        { name: 'Reports', icon: '📉' },
+        { name: 'Risk Management', icon: '🛡️' },
+        { name: 'Market Analysis', icon: '🌐' },
+        { name: 'Paper trading', icon: '📝' },
+        { name: 'Community', icon: '👥' },
+        { name: 'Challenge', icon: '🏆' },
+        { name: 'Calendar', icon: '📅' }
+      ];
+
+      return (
+        <div class="flex h-screen overflow-hidden bg-[#090d16] text-slate-300">
+          
+          {/* Left Navigation Sidebar */}
+          <aside class="w-60 bg-[#0d1320] border-r border-slate-800/80 p-4 flex flex-col justify-between shrink-0">
+            <div class="space-y-6 overflow-y-auto pr-1">
+              <div class="flex items-center space-x-2.5 px-2">
+                <div class="w-6 h-6 bg-blue-600 rounded flex items-center justify-center font-black text-white text-xs">📈</div>
+                <span class="font-extrabold text-sm tracking-tight text-white">Trade Diary</span>
+              </div>
+
+              <nav class="space-y-0.5">
+                {navItems.map((item) => (
+                  <button
+                    key={item.name}
+                    onClick={() => setActiveTab(item.name)}
+                    class={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                      activeTab === item.name
+                        ? 'bg-blue-600/90 text-white font-bold shadow-md shadow-blue-600/20'
+                        : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                    }`}
+                  >
+                    <span class="text-sm">{item.icon}</span>
+                    <span>{item.name}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            <div class="p-2.5 bg-[#0a0f1d] rounded-xl border border-slate-800/80 flex items-center space-x-2.5">
+              <div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">GD</div>
+              <div class="text-xs overflow-hidden">
+                <p class="font-bold text-white text-[11px] truncate">Gaurav Dhiman</p>
+                <p class="text-[9px] text-emerald-400 font-semibold">Pro Plan</p>
+              </div>
+            </div>
+          </aside>
+
+          {/* Main Display Engine */}
+          <main class="flex-1 flex flex-col min-w-0 overflow-y-auto bg-[#090d16]">
+            
+            {/* Top Bar Tickers */}
+            <div class="bg-[#0b101c] border-b border-slate-800/80 px-5 py-2 flex items-center justify-between text-[11px] whitespace-nowrap overflow-x-auto scrollbar-none">
+              <div class="flex items-center space-x-5 font-mono text-[10px]">
+                <span>Nifty Media: <span class="text-emerald-400 font-bold">+2.53%</span></span>
+                <span>Nifty Metal: <span class="text-rose-400 font-bold">-1.56%</span></span>
+                <span>Nifty Pharma: <span class="text-rose-400 font-bold">-1.88%</span></span>
+                <span>Nifty Pvt Bank: <span class="text-emerald-400 font-bold">+0.95%</span></span>
+                <span>Nifty PSU Bank: <span class="text-emerald-400 font-bold">+0.54%</span></span>
+                <span>Nifty Fin Service: <span class="text-emerald-400 font-bold">+0.13%</span></span>
+              </div>
+              <div class="flex items-center space-x-2.5 shrink-0 ml-4">
+                <button class="bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded text-[10px]">Indian ▾</button>
+                <button class="bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded text-[10px]">Last 30 Days ▾</button>
+                <button onClick={() => setShowModal(true)} class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded font-bold text-[11px] shadow-md shadow-blue-600/30">
+                  + New Trade
+                </button>
+              </div>
+            </div>
+
+            {/* Dashboard Workspace */}
+            <div class="p-6 space-y-5 max-w-[1400px] mx-auto w-full">
+
+              {activeTab === 'Dashboard' && (
+                <div class="space-y-5">
+                  
+                  {/* Top Notification Bar */}
+                  <div class="bg-[#0d1527] border border-blue-900/40 p-3 rounded-xl flex items-center justify-between text-xs">
+                    <div class="flex items-center space-x-3">
+                      <span class="text-blue-400">🔔</span>
+                      <div>
+                        <p class="font-bold text-slate-200">Stay on Track with Your Trading Journal</p>
+                        <p class="text-[10px] text-slate-400">Get timely reminders to keep your journal up to date and never miss a trade analysis.</p>
+                      </div>
+                    </div>
+                    <div class="flex space-x-2">
+                      <button class="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold">Enable</button>
+                      <button class="bg-slate-800 text-slate-400 px-3 py-1 rounded text-xs">Later</button>
+                    </div>
+                  </div>
+
+                  {/* 4 KPI Metric Cards */}
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">HIGHEST P&L</p>
+                      <p class="text-xl font-extrabold text-emerald-400 mt-1">₹{highestPnl}</p>
+                      <p class="text-[9px] text-slate-500 mt-1">0% vs last 30 days</p>
+                    </div>
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">WIN RATE</p>
+                      <p class="text-xl font-extrabold text-blue-400 mt-1">{winRate}%</p>
+                      <p class="text-[9px] text-slate-500 mt-1">0% vs last 30 days</p>
+                    </div>
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">AVG. RISK/REWARD</p>
+                      <p class="text-xl font-extrabold text-purple-400 mt-1">1:2</p>
+                      <p class="text-[9px] text-slate-500 mt-1">0% vs last 30 days</p>
+                    </div>
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">TRADES THIS MONTH</p>
+                      <p class="text-xl font-extrabold text-amber-400 mt-1">{trades.length}</p>
+                      <p class="text-[9px] text-slate-500 mt-1">0 vs last 30 days</p>
+                    </div>
+                  </div>
+
+                  {/* Confidence Index Gauge */}
+                  <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                      <span class="font-bold text-slate-300">Confidence Index</span>
+                      <span class="text-slate-500 text-[10px]">Last 30 Days</span>
+                    </div>
+                    <div class="h-2 w-full bg-slate-900 rounded-full overflow-hidden p-0.5 relative">
+                      <div class="h-full bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-500 rounded-full" style={{ width: `${avgConfidence}%` }}></div>
+                    </div>
+                    <div class="flex justify-between text-[9px] text-slate-500">
+                      <span>Low</span>
+                      <span>High</span>
+                    </div>
+                  </div>
+
+                  {/* Cumulative P&L & Top Trades */}
+                  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    <div class="lg:col-span-2 bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-72 flex flex-col justify-between">
+                      <div class="flex justify-between items-center">
+                        <span class="font-bold text-xs text-slate-300">Cumulative P&L</span>
+                        <div class="flex space-x-1 text-[9px] bg-slate-900 p-0.5 rounded border border-slate-800">
+                          <button class="px-2 py-0.5 bg-blue-600 rounded text-white font-bold">D</button>
+                          <button class="px-2 py-0.5 text-slate-400">W</button>
+                          <button class="px-2 py-0.5 text-slate-400">M</button>
+                        </div>
+                      </div>
+                      <div class="h-56 w-full pt-2">
+                        <canvas ref={pnlChartRef}></canvas>
+                      </div>
+                    </div>
+
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-72 flex flex-col justify-between">
+                      <div class="flex justify-between items-center">
+                        <span class="font-bold text-xs text-slate-300">Top Trades</span>
+                        <span class="text-[10px] text-blue-400 cursor-pointer">View All ➔</span>
+                      </div>
+                      <div class="flex-1 flex flex-col items-center justify-center text-xs">
+                        {trades.length === 0 ? (
+                          <p class="text-slate-600 text-xs">No top trades yet</p>
+                        ) : (
+                          <div class="w-full space-y-2 overflow-y-auto max-h-48 pr-1">
+                            {trades.slice(0, 4).map(t => (
+                              <div key={t.id} class="flex justify-between p-2 bg-[#090e18] rounded border border-slate-800/60 text-xs">
+                                <span class="font-bold text-white">{t.symbol} ({t.strategy})</span>
+                                <span class={parseFloat(t.pnl) >= 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>₹{t.pnl}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Win/Loss & Strategy Performance */}
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-52 flex flex-col justify-between">
+                      <span class="font-bold text-xs text-slate-300">Win/Loss Distribution</span>
+                      <div class="h-32 w-32 relative my-auto mx-auto">
+                        <canvas ref={winLossChartRef}></canvas>
+                      </div>
+                    </div>
+
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-52 flex flex-col justify-between">
+                      <span class="font-bold text-xs text-slate-300">Strategy vs P&L</span>
+                      <div class="flex-1 flex items-center justify-center text-slate-500 text-xs">
+                        {trades.length === 0 ? "No strategy insights yet" : (
+                          <div class="w-full space-y-1.5 overflow-y-auto max-h-36 pr-1">
+                            {SETUPS.map((strat, i) => {
+                              const stratTrades = trades.filter(t => t.strategy === strat);
+                              const stratPnl = stratTrades.reduce((a, b) => a + parseFloat(b.pnl), 0).toFixed(2);
+                              return (
+                                <div key={i} class="flex justify-between text-xs p-1.5 bg-slate-900/50 rounded border border-slate-800">
+                                  <span class="text-slate-400">{strat}</span>
+                                  <span class={`font-bold ${stratPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{stratPnl}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mistakes & Daily Heatmap */}
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-48 flex flex-col justify-between">
+                      <span class="font-bold text-xs text-slate-300">Most Common Mistakes</span>
+                      <div class="flex-1 flex flex-col items-center justify-center text-xs">
+                        {trades.filter(t => t.mistake !== 'None').length === 0 ? (
+                          <p class="text-emerald-500 font-bold">✔ No mistakes found! Keep up the discipline.</p>
+                        ) : (
+                          <div class="w-full space-y-1 text-xs">
+                            {MISTAKES.map((m, i) => {
+                              const count = trades.filter(t => t.mistake === m).length;
+                              if (!count) return null;
+                              return (
+                                <div key={i} class="flex justify-between p-1 text-rose-300 bg-rose-950/20 rounded">
+                                  <span>{m}</span>
+                                  <span class="font-bold">{count} times</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-48 flex flex-col justify-between">
+                      <span class="font-bold text-xs text-slate-300">Daily P&L Calendar Heatmap</span>
+                      <div class="grid grid-cols-7 gap-1 pt-1">
+                        {Array.from({ length: 21 }).map((_, i) => {
+                          const trade = trades[i % trades.length];
+                          const pnl = trade ? parseFloat(trade.pnl) : 0;
+                          return (
+                            <div key={i} class={`h-8 rounded flex items-center justify-center text-[9px] font-mono border border-slate-800 ${!trade ? 'bg-slate-900/40 text-slate-600' : (pnl >= 0 ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800' : 'bg-rose-950/80 text-rose-400 border-rose-800')}`}>
+                              {trade ? `₹${pnl}` : '-'}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+              {/* TRADES LOG TABLE TAB */}
+              {activeTab === 'Trades' && (
+                <div class="bg-[#0c1220] border border-slate-800 rounded-xl overflow-hidden">
+                  <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                    <h2 class="font-bold text-xs text-slate-200">Trade Execution Log</h2>
+                  </div>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-300">
+                      <thead class="bg-slate-950 text-slate-500 uppercase text-[9px]">
+                        <tr>
+                          <th class="p-3">Date</th>
+                          <th class="p-3">Symbol</th>
+                          <th class="p-3">Strategy</th>
+                          <th class="p-3">Type</th>
+                          <th class="p-3">Qty</th>
+                          <th class="p-3">Entry / Exit</th>
+                          <th class="p-3">P&L</th>
+                          <th class="p-3">Mistake Tag</th>
+                          <th class="p-3">TradingView Chart</th>
+                          <th class="p-3">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-800/60">
+                        {trades.map(t => (
+                          <tr key={t.id} class="hover:bg-slate-800/20">
+                            <td class="p-3 text-slate-500">{t.date}</td>
+                            <td class="p-3 font-bold text-white">{t.symbol}</td>
+                            <td class="p-3 text-blue-400 font-medium">{t.strategy}</td>
+                            <td class={`p-3 font-bold ${t.type === 'BUY' ? 'text-emerald-400' : 'text-amber-400'}`}>{t.type}</td>
+                            <td class="p-3">{t.qty}</td>
+                            <td class="p-3 font-mono">{t.entry} / {t.exit}</td>
+                            <td class={`p-3 font-black ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{t.pnl}</td>
+                            <td class="p-3"><span class={`px-2 py-0.5 rounded text-[10px] ${t.mistake === 'None' ? 'bg-slate-900 text-slate-500' : 'bg-rose-950 text-rose-300 border border-rose-800'}`}>{t.mistake}</span></td>
+                            <td class="p-3">{t.chartUrl ? <a href={t.chartUrl} target="_blank" class="text-blue-400 underline font-bold">Chart</a> : '-'}</td>
+                            <td class="p-3"><button onClick={() => deleteTrade(t.id)} class="text-rose-400 hover:underline">Delete</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </main>
+
+          {/* New Execution Entry Modal */}
+          {showModal && (
+            <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div class="bg-[#0c1220] border border-slate-800 rounded-xl w-full max-w-md p-5 space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
+                  <h3 class="font-bold text-xs text-white">Log Execution to Diary</h3>
+                  <button onClick={() => setShowModal(false)} class="text-slate-500 hover:text-white">✕</button>
+                </div>
+                <form onSubmit={handleAddTrade} class="space-y-3 text-xs">
+                  <div class="grid grid-cols-2 gap-2.5">
+                    <input type="text" placeholder="Symbol (NIFTY)" value={formData.symbol} onChange={e=>setFormData({...formData, symbol: e.target.value.toUpperCase()})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
+                    <select value={formData.type} onChange={e=>setFormData({...formData, type: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded">
+                      <option value="BUY">BUY</option>
+                      <option value="SELL">SELL</option>
+                    </select>
+                  </div>
+                  <div class="grid grid-cols-3 gap-2.5">
+                    <input type="number" placeholder="Qty" value={formData.qty} onChange={e=>setFormData({...formData, qty: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
+                    <input type="number" step="any" placeholder="Entry" value={formData.entry} onChange={e=>setFormData({...formData, entry: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
+                    <input type="number" step="any" placeholder="Exit" value={formData.exit} onChange={e=>setFormData({...formData, exit: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
+                  </div>
+                  <div class="grid grid-cols-2 gap-2.5">
+                    <select value={formData.strategy} onChange={e=>setFormData({...formData, strategy: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded text-blue-300">
+                      {SETUPS.map((s, idx) => <option key={idx} value={s}>{s}</option>)}
+                    </select>
+                    <select value={formData.mistake} onChange={e=>setFormData({...formData, mistake: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded text-rose-300">
+                      <option value="None">No Mistake</option>
+                      {MISTAKES.map((m, idx) => <option key={idx} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <input type="url" placeholder="TradingView Screenshot Link" value={formData.chartUrl} onChange={e=>setFormData({...formData, chartUrl: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded w-full" />
+                  <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 font-bold py-2.5 rounded text-white transition shadow-md shadow-blue-600/30">
+                    Save Trade to Diary
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Smart Trade Diary - Custom Style Suite</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
