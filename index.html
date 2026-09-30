@@ -3,6 +3,391 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Trade Diary - Complete Custom Setup & Live Data</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-[#090d16] text-slate-200 antialiased font-sans min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const DEFAULT_SETUPS = [
+      "HTF Level Marking", "Channel Breakout", "Range Break", 
+      "Inside Candle", "Fibo Level", "W / M Pattern", "Cup & Handle", "System Rule"
+    ];
+
+    const DEFAULT_SYMBOLS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "RELIANCE", "HDFCBANK"];
+
+    const OUTCOME_TAGS = [
+      "Target Hit", "Trail Target Hit", "CTC Target Hit",
+      "SL Hit", "SL CTC Hit", "Missed - Hit Target Later", "Avoided - Saved Loss"
+    ];
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('Dashboard');
+      const [trades, setTrades] = useState(() => {
+        const saved = localStorage.getItem('trade_diary_full_v2');
+        return saved ? JSON.parse(saved) : [];
+      });
+
+      const [showModal, setShowModal] = useState(false);
+      const [editingTrade, setEditingTrade] = useState(null);
+
+      const [formData, setFormData] = useState({
+        date: new Date().toISOString().split('T')[0],
+        planTime: '09:30',
+        entryTime: '',
+        status: 'PLANNED',
+        symbol: 'NIFTY',
+        type: 'BUY',
+        setup: 'HTF Level Marking',
+        mindsetOk: true,
+        qty: '',
+        entry: '',
+        exit: '',
+        sl: '',
+        target: '',
+        outcome: 'Target Hit',
+        chartUrl: '',
+        notes: '',
+        postAnalysis: ''
+      });
+
+      const pnlChartRef = useRef(null);
+
+      useEffect(() => {
+        localStorage.setItem('trade_diary_full_v2', JSON.stringify(trades));
+      }, [trades]);
+
+      useEffect(() => {
+        if (activeTab !== 'Dashboard') return;
+        if (pnlChartRef.current) {
+          const ctx = pnlChartRef.current.getContext('2d');
+          let cumPnl = 0;
+          const takenTrades = trades.filter(t => t.status === 'TAKEN');
+          const labels = takenTrades.map(t => t.date);
+          const data = takenTrades.map(t => {
+            cumPnl += parseFloat(t.pnl || 0);
+            return cumPnl;
+          });
+
+          if (window.myPnlChart) window.myPnlChart.destroy();
+          window.myPnlChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: labels.length ? labels : ['Day 1'],
+              datasets: [{
+                label: 'Cumulative P&L (₹)',
+                data: data.length ? data : [0],
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.35,
+                borderWidth: 2,
+                pointRadius: 4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#64748b' } },
+                y: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#64748b' } }
+              }
+            }
+          });
+        }
+      }, [activeTab, trades]);
+
+      const calculateTimeGap = (pTime, eTime) => {
+        if (!pTime || !eTime) return '0 mins';
+        const [pH, pM] = pTime.split(':').map(Number);
+        const [eH, eM] = eTime.split(':').map(Number);
+        const diff = (eH * 60 + eM) - (pH * 60 + pM);
+        return diff >= 0 ? `${diff} mins` : 'N/A';
+      };
+
+      const handleSaveTrade = (e) => {
+        e.preventDefault();
+        let pnl = '0.00';
+        if (formData.status === 'TAKEN' && formData.entry && formData.exit && formData.qty) {
+          const entry = parseFloat(formData.entry);
+          const exit = parseFloat(formData.exit);
+          const qty = parseFloat(formData.qty);
+          pnl = ((exit - entry) * qty * (formData.type === 'BUY' ? 1 : -1)).toFixed(2);
+        }
+
+        const timeGap = calculateTimeGap(formData.planTime, formData.entryTime);
+
+        if (editingTrade) {
+          setTrades(trades.map(t => t.id === editingTrade.id ? { ...t, ...formData, pnl, timeGap } : t));
+        } else {
+          setTrades([{ id: Date.now(), ...formData, pnl, timeGap }, ...trades]);
+        }
+
+        setShowModal(false);
+        setEditingTrade(null);
+      };
+
+      const openEditModal = (trade) => {
+        setEditingTrade(trade);
+        setFormData({ ...trade });
+        setShowModal(true);
+      };
+
+      const deleteTrade = (id) => setTrades(trades.filter(t => t.id !== id));
+
+      const takenTrades = trades.filter(t => t.status === 'TAKEN');
+      const totalPnl = takenTrades.reduce((a, b) => a + parseFloat(b.pnl || 0), 0).toFixed(2);
+      const wins = takenTrades.filter(t => parseFloat(t.pnl) > 0).length;
+      const winRate = takenTrades.length ? ((wins / takenTrades.length) * 100).toFixed(0) : 0;
+
+      return (
+        <div class="flex h-screen overflow-hidden bg-[#090d16] text-slate-300">
+          
+          {/* Left Sidebar */}
+          <aside class="w-60 bg-[#0d1320] border-r border-slate-800/80 p-4 flex flex-col justify-between shrink-0">
+            <div class="space-y-6">
+              <div class="flex items-center space-x-2 px-2">
+                <div class="w-7 h-7 bg-blue-600 rounded flex items-center justify-center font-black text-white text-xs">📊</div>
+                <span class="font-extrabold text-sm tracking-tight text-white">Trade Diary Pro</span>
+              </div>
+
+              <nav class="space-y-1">
+                {['Dashboard', 'Execution Pipeline', 'Live TradingView Charts'].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    class={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition ${
+                      activeTab === tab ? 'bg-blue-600 text-white font-bold shadow-md' : 'text-slate-400 hover:bg-slate-800/40'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            <div class="p-2.5 bg-[#0a0f1d] rounded-xl border border-slate-800 flex items-center space-x-2.5">
+              <div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">GD</div>
+              <div class="text-xs">
+                <p class="font-bold text-white text-[11px]">Gaurav Dhiman</p>
+                <p class="text-[9px] text-emerald-400">Pro Setup & Live Feed</p>
+              </div>
+            </div>
+          </aside>
+
+          {/* Main Workspace */}
+          <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+            
+            {/* Top Live Ticker Widget */}
+            <header class="bg-[#0b101c] border-b border-slate-800/80 px-6 py-2.5 flex items-center justify-between sticky top-0 z-10">
+              <div class="flex space-x-6 text-xs font-mono items-center">
+                <span class="text-slate-400">NIFTY 50: <span class="text-emerald-400 font-bold">26,042.80 (+0.4%)</span></span>
+                <span class="text-slate-400">BANKNIFTY: <span class="text-rose-400 font-bold">59,011.35 (-0.2%)</span></span>
+                <span class="text-slate-400">FINNIFTY: <span class="text-emerald-400 font-bold">27,110.15 (+0.3%)</span></span>
+              </div>
+              <button onClick={() => {
+                setEditingTrade(null);
+                setFormData({ date: new Date().toISOString().split('T')[0], planTime: '09:30', entryTime: '', status: 'PLANNED', symbol: 'NIFTY', type: 'BUY', setup: 'HTF Level Marking', mindsetOk: true, qty: '', entry: '', exit: '', sl: '', target: '', outcome: 'Target Hit', chartUrl: '', notes: '', postAnalysis: '' });
+                setShowModal(true);
+              }} class="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-1.5 rounded font-bold text-xs shadow-md">
+                + Plan New Trade
+              </button>
+            </header>
+
+            <div class="p-6 space-y-5 max-w-[1400px] mx-auto w-full">
+
+              {activeTab === 'Dashboard' && (
+                <div class="space-y-5">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">NET REALIZED P&L</p>
+                      <p class={`text-2xl font-black mt-1 ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{totalPnl}</p>
+                    </div>
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">WIN RATE</p>
+                      <p class="text-2xl font-black text-blue-400 mt-1">{winRate}%</p>
+                    </div>
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">MISSED TRADES</p>
+                      <p class="text-2xl font-black text-amber-400 mt-1">{trades.filter(t => t.status === 'MISSED').length}</p>
+                    </div>
+                    <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">AVOIDED TRADES</p>
+                      <p class="text-2xl font-black text-indigo-400 mt-1">{trades.filter(t => t.status === 'AVOIDED').length}</p>
+                    </div>
+                  </div>
+
+                  <div class="bg-[#0c1220] border border-slate-800/80 p-4 rounded-xl h-72">
+                    <span class="font-bold text-xs text-slate-300">Cumulative Realized P&L Equity Curve</span>
+                    <div class="h-56 w-full pt-2"><canvas ref={pnlChartRef}></canvas></div>
+                  </div>
+                </div>
+              )}
+
+              {/* EXECUTION PIPELINE TAB */}
+              {activeTab === 'Execution Pipeline' && (
+                <div class="bg-[#0c1220] border border-slate-800 rounded-xl overflow-hidden">
+                  <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                    <h2 class="font-bold text-xs text-slate-200">Execution Pipeline Log</h2>
+                  </div>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-300">
+                      <thead class="bg-slate-950 text-slate-500 uppercase text-[9px]">
+                        <tr>
+                          <th class="p-3">Status</th>
+                          <th class="p-3">Symbol</th>
+                          <th class="p-3">Setup Tag</th>
+                          <th class="p-3">Plan / Entry Time</th>
+                          <th class="p-3">Time Gap</th>
+                          <th class="p-3">Entry/Exit</th>
+                          <th class="p-3">Outcome</th>
+                          <th class="p-3">P&L</th>
+                          <th class="p-3">Chart Link</th>
+                          <th class="p-3">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-800/60">
+                        {trades.map(t => (
+                          <tr key={t.id} class="hover:bg-slate-800/20">
+                            <td class="p-3">
+                              <span class={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                t.status === 'PLANNED' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
+                                t.status === 'TAKEN' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
+                                t.status === 'MISSED' ? 'bg-rose-950 text-rose-300 border border-rose-800' :
+                                'bg-slate-800 text-slate-300'
+                              }`}>{t.status}</span>
+                            </td>
+                            <td class="p-3 font-bold text-white">{t.symbol}</td>
+                            <td class="p-3 text-blue-400 font-semibold">{t.setup}</td>
+                            <td class="p-3 text-slate-400 font-mono">{t.planTime} $\rightarrow$ {t.entryTime || 'N/A'}</td>
+                            <td class="p-3 text-indigo-400 font-bold font-mono">{t.timeGap}</td>
+                            <td class="p-3 font-mono">{t.entry || '-'} / {t.exit || '-'}</td>
+                            <td class="p-3"><span class="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">{t.outcome}</span></td>
+                            <td class={`p-3 font-black ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{t.pnl}</td>
+                            <td class="p-3">{t.chartUrl ? <a href={t.chartUrl} target="_blank" class="text-blue-400 underline font-bold">Chart Link</a> : '-'}</td>
+                            <td class="p-3 space-x-2">
+                              <button onClick={() => openEditModal(t)} class="text-blue-400 hover:underline font-bold">Edit</button>
+                              <button onClick={() => deleteTrade(t.id)} class="text-rose-400 hover:underline">Delete</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* LIVE CHARTS TAB */}
+              {activeTab === 'Live TradingView Charts' && (
+                <div class="bg-[#0c1220] border border-slate-800 p-4 rounded-xl space-y-3">
+                  <h2 class="text-xs font-bold text-slate-300">Live NIFTY Technical Analysis Frame</h2>
+                  <div class="w-full h-[550px] rounded-xl overflow-hidden border border-slate-800">
+                    <iframe src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_1&symbol=NSE%3ANIFTY&interval=5&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=dark&style=1" class="w-full h-full border-0"></iframe>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </main>
+
+          {/* Modal with Setups & Symbols Dropdown */}
+          {showModal && (
+            <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div class="bg-[#0c1220] border border-slate-800 rounded-xl w-full max-w-lg p-5 space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
+                  <h3 class="font-bold text-xs text-white">{editingTrade ? 'Update Trade Execution' : 'Plan New Trade'}</h3>
+                  <button onClick={() => setShowModal(false)} class="text-slate-500 hover:text-white">✕</button>
+                </div>
+
+                <form onSubmit={handleSaveTrade} class="space-y-3 text-xs">
+                  
+                  {/* Symbol & Setup Selection */}
+                  <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label class="text-[10px] text-slate-500 block mb-1">Symbol Index / Stock</label>
+                      <select value={formData.symbol} onChange={e=>setFormData({...formData, symbol: e.target.value})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded text-white font-bold">
+                        {DEFAULT_SYMBOLS.map((sym, idx) => <option key={idx} value={sym}>{sym}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label class="text-[10px] text-slate-500 block mb-1">Setup Type</label>
+                      <select value={formData.setup} onChange={e=>setFormData({...formData, setup: e.target.value})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded text-blue-300 font-bold">
+                        {DEFAULT_SETUPS.map((s, idx) => <option key={idx} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Status & Times */}
+                  <div class="grid grid-cols-3 gap-2.5">
+                    <div>
+                      <label class="text-[10px] text-slate-500 block mb-1">Status</label>
+                      <select value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded">
+                        <option value="PLANNED">PLANNED</option>
+                        <option value="TAKEN">TAKEN</option>
+                        <option value="AVOIDED">AVOIDED</option>
+                        <option value="MISSED">MISSED</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="text-[10px] text-slate-500 block mb-1">Plan Time</label>
+                      <input type="time" value={formData.planTime} onChange={e=>setFormData({...formData, planTime: e.target.value})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded" required />
+                    </div>
+                    <div>
+                      <label class="text-[10px] text-slate-500 block mb-1">Entry Time</label>
+                      <input type="time" value={formData.entryTime} onChange={e=>setFormData({...formData, entryTime: e.target.value})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded" />
+                    </div>
+                  </div>
+
+                  {/* Pricing */}
+                  <div class="grid grid-cols-4 gap-2.5">
+                    <input type="number" placeholder="Qty" value={formData.qty} onChange={e=>setFormData({...formData, qty: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" />
+                    <input type="number" step="any" placeholder="Entry" value={formData.entry} onChange={e=>setFormData({...formData, entry: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" />
+                    <input type="number" step="any" placeholder="Exit" value={formData.exit} onChange={e=>setFormData({...formData, exit: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" />
+                    <select value={formData.type} onChange={e=>setFormData({...formData, type: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded">
+                      <option value="BUY">BUY</option>
+                      <option value="SELL">SELL</option>
+                    </select>
+                  </div>
+
+                  {/* Result Outcome Tag */}
+                  <div>
+                    <label class="text-[10px] text-slate-500 block mb-1">Result Outcome Tag</label>
+                    <select value={formData.outcome} onChange={e=>setFormData({...formData, outcome: e.target.value})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded text-emerald-300">
+                      {OUTCOME_TAGS.map((tag, idx) => <option key={idx} value={tag}>{tag}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Screenshot Link */}
+                  <input type="url" placeholder="TradingView Screenshot Link (https://...)" value={formData.chartUrl} onChange={e=>setFormData({...formData, chartUrl: e.target.value})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded" />
+
+                  <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 font-bold py-2.5 rounded text-white transition shadow-md shadow-blue-600/30">
+                    Save Trade to Diary
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Smart Trade Diary - Timeline & Execution Latency Engine</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
