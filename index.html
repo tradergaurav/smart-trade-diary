@@ -3,6 +3,515 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trade Diary Pro - Interactive Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @keyframes marquee {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+    .animate-marquee {
+      display: flex;
+      white-space: nowrap;
+      animation: marquee 25s linear infinite;
+    }
+    .animate-marquee:hover { animation-play-state: paused; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b0e17; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-[#0b0e17] text-slate-200 font-sans antialiased min-h-screen selection:bg-blue-600 selection:text-white">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const INITIAL_TRADES = [
+      { id: 1, date: '1 Oct 2026', symbol: 'NUVAMA', direction: 'Long', entry: 2100, exit: 2120, pnl: '55', r: '1:0.33', strategy: 'Channel', outcome: 'Followed Plan' },
+      { id: 2, date: '28 Sept 2026', symbol: 'SOL', direction: 'Long', entry: 2500, exit: 2600, pnl: '900', r: 'N/A', strategy: 'Triangle', outcome: 'Full Success' }
+    ];
+
+    function App() {
+      const [currentTab, setCurrentTab] = useState('Dashboard');
+      const [trades, setTrades] = useState(() => {
+        const saved = localStorage.getItem('tradediary_final_v14');
+        return saved ? JSON.parse(saved) : INITIAL_TRADES;
+      });
+
+      const [showModal, setShowModal] = useState(false);
+      const [formData, setFormData] = useState({
+        date: '1 Oct 2026', symbol: 'NUVAMA', direction: 'Long', entry: '', exit: '', qty: '1', strategy: 'Channel', outcome: 'Followed Plan'
+      });
+
+      const pnlChartRef = useRef(null);
+
+      useEffect(() => {
+        localStorage.setItem('tradediary_final_v14', JSON.stringify(trades));
+      }, [trades]);
+
+      useEffect(() => {
+        if (currentTab !== 'Dashboard') return;
+        if (pnlChartRef.current) {
+          const ctx = pnlChartRef.current.getContext('2d');
+          let cumPnl = 0;
+          const labels = trades.map(t => t.date);
+          const data = trades.map(t => {
+            cumPnl += parseFloat(t.pnl || 0);
+            return cumPnl;
+          });
+
+          if (window.myPnlChart) window.myPnlChart.destroy();
+          window.myPnlChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: labels.length ? labels : ['Day 1'],
+              datasets: [{
+                label: 'Cumulative P&L',
+                data: data.length ? data : [0],
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.15)',
+                fill: true, tension: 0.3, borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#3b82f6'
+              }]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#64748b', font: { size: 10 } } },
+                y: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#64748b', font: { size: 10 } } }
+              }
+            }
+          });
+        }
+      }, [currentTab, trades]);
+
+      const handleAddTrade = (e) => {
+        e.preventDefault();
+        const entry = parseFloat(formData.entry || 0);
+        const exit = parseFloat(formData.exit || 0);
+        const qty = parseFloat(formData.qty || 1);
+        const pnl = ((exit - entry) * qty * (formData.direction === 'Long' ? 1 : -1)).toFixed(0);
+
+        const newTrade = { id: Date.now(), ...formData, pnl, r: '1:1.0' };
+        setTrades([newTrade, ...trades]);
+        setShowModal(false);
+      };
+
+      const deleteTrade = (id) => setTrades(trades.filter(t => t.id !== id));
+      const totalPnl = trades.reduce((a, b) => a + parseFloat(b.pnl || 0), 0).toFixed(0);
+
+      const menuList = [
+        { id: 'Dashboard', label: 'Dashboard', icon: '📊' },
+        { id: 'Trading Checklist', label: 'Trading Checklist', icon: '✅' },
+        { id: 'Trades', label: 'Trades', icon: '📈' },
+        { id: 'Strategies', label: 'Strategies', icon: '💡' },
+        { id: 'Rules', label: 'Rules', icon: '🛡️' },
+        { id: 'Mistakes', label: 'Mistakes', icon: '⚠️️' },
+        { id: 'AI Summarizer', label: 'AI Summarizer', icon: '🤖' },
+        { id: 'Reports', label: 'Reports', icon: '📋' },
+        { id: 'Risk Management', label: 'Risk Management', icon: '⚖️' },
+        { id: 'Market Analysis', label: 'Market Analysis', icon: '🌐' },
+        { id: 'Paper trading', label: 'Paper trading', icon: '📝', badge: 'New' },
+        { id: 'Community', label: 'Community', icon: '💬' },
+        { id: 'Challenge', label: 'Challenge', icon: '🏆' },
+        { id: 'Calendar', label: 'Calendar', icon: '📅' },
+        { id: 'Affiliate', label: 'Affiliate', icon: '👑' }
+      ];
+
+      return (
+        <div class="flex h-screen overflow-hidden bg-[#0b0e17]">
+          
+          {/* Left Navigation Sidebar */}
+          <aside class="w-60 bg-[#101422] border-r border-slate-800/60 p-4 flex flex-col justify-between shrink-0">
+            <div class="space-y-5 overflow-y-auto pr-1">
+              <div class="flex items-center space-x-2.5 px-2">
+                <div class="w-6 h-6 bg-blue-600 rounded flex items-center justify-center font-black text-white text-xs">📈</div>
+                <span class="font-bold text-sm text-white">Trade Diary</span>
+              </div>
+
+              <nav class="space-y-1">
+                {menuList.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setCurrentTab(item.id)}
+                    class={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+                      currentTab === item.id
+                        ? 'bg-blue-600/20 text-blue-400 font-bold border-l-2 border-blue-500'
+                        : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                    }`}
+                  >
+                    <div class="flex items-center space-x-2.5">
+                      <span>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </div>
+                    {item.badge && <span class="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold">{item.badge}</span>}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            <div class="p-2.5 bg-[#0d101d] rounded-xl border border-slate-800/80 flex items-center space-x-2">
+              <div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">G</div>
+              <div class="text-xs overflow-hidden">
+                <p class="font-bold text-white text-[11px] truncate">Gaurav Dhiman</p>
+                <p class="text-[9px] text-emerald-400 font-semibold">Pro Active</p>
+              </div>
+            </div>
+          </aside>
+
+          {/* Main Workspace Display */}
+          <main class="flex-1 flex flex-col min-w-0 overflow-y-auto bg-[#0b0e17]">
+            
+            {/* Header Live Ticker */}
+            <div class="bg-[#0f1322] border-b border-slate-800/60 py-1.5 overflow-hidden">
+              <div class="animate-marquee space-x-8 text-[11px] font-mono text-slate-400">
+                <span>Nifty Bank: <span class="text-rose-500 font-bold">-0.33%</span></span>
+                <span>Nifty Realty: <span class="text-rose-500 font-bold">-1.42%</span></span>
+                <span>Nifty Auto: <span class="text-rose-500 font-bold">-3.58%</span></span>
+                <span>Nifty FMCG: <span class="text-rose-500 font-bold">-1.65%</span></span>
+                <span>NIFTY HEALTHCARE: <span class="text-rose-500 font-bold">-0.24%</span></span>
+                <span>NIFTY IT: <span class="text-emerald-400 font-bold">+2.12%</span></span>
+              </div>
+            </div>
+
+            <div class="p-6 max-w-[1400px] mx-auto w-full">
+
+              {/* 1. DASHBOARD TAB */}
+              {currentTab === 'Dashboard' && (
+                <div class="space-y-6">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">HIGHEST P&L</p>
+                      <p class="text-xl font-bold text-emerald-400 mt-1">₹{totalPnl}</p>
+                    </div>
+                    <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">WIN RATE</p>
+                      <p class="text-xl font-bold text-blue-400 mt-1">100%</p>
+                    </div>
+                    <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">AVG. RISK/REWARD</p>
+                      <p class="text-xl font-bold text-purple-400 mt-1">1:0</p>
+                    </div>
+                    <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl">
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">TRADES THIS MONTH</p>
+                      <p class="text-xl font-bold text-amber-400 mt-1">{trades.length}</p>
+                    </div>
+                  </div>
+
+                  <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl h-72">
+                    <span class="font-bold text-xs text-slate-300">Cumulative Equity Curve</span>
+                    <div class="h-56 w-full pt-2"><canvas ref={pnlChartRef}></canvas></div>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. TRADING CHECKLIST TAB */}
+              {currentTab === 'Trading Checklist' && (
+                <div class="space-y-5">
+                  <div class="flex justify-between items-center">
+                    <h2 class="font-bold text-sm text-white">Daily Trading Checklist</h2>
+                    <button class="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold">💾 Save</button>
+                  </div>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl space-y-3">
+                      <h3 class="font-bold text-xs text-amber-400">☀ Pre-Market Preparation</h3>
+                      <div class="space-y-2 text-xs">
+                        {["Check Global Indices & Geopolitics", "Review Nifty/BankNifty Key Levels", "Analyze FII/DII Data & OI", "Check Economic Calendar"].map((item, i) => (
+                          <label key={i} class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+                            <input type="checkbox" class="accent-blue-600 rounded" />
+                            <span>{item}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl space-y-3">
+                      <h3 class="font-bold text-xs text-indigo-400">🌙 Post-Market Review</h3>
+                      <div class="space-y-2 text-xs">
+                        {["Journal All Executed Trades", "Upload Charts with Entries/Exits", "Did I Follow My Rules 100%?", "Calculate Daily P&L & Charges"].map((item, i) => (
+                          <label key={i} class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+                            <input type="checkbox" class="accent-blue-600 rounded" />
+                            <span>{item}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. TRADES TAB */}
+              {currentTab === 'Trades' && (
+                <div class="bg-[#101422] border border-slate-800 rounded-xl p-4 space-y-4">
+                  <div class="flex justify-between items-center">
+                    <h2 class="font-bold text-sm text-white">Trade History</h2>
+                    <button onClick={() => setShowModal(true)} class="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold">+ New Trade</button>
+                  </div>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-300">
+                      <thead class="bg-slate-950 text-slate-500 uppercase text-[9px]">
+                        <tr>
+                          <th class="p-3">Date</th>
+                          <th class="p-3">Symbol</th>
+                          <th class="p-3">Direction</th>
+                          <th class="p-3">Entry/Exit</th>
+                          <th class="p-3">P/L</th>
+                          <th class="p-3">Strategy</th>
+                          <th class="p-3">Outcome</th>
+                          <th class="p-3">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-800/60">
+                        {trades.map(t => (
+                          <tr key={t.id} class="hover:bg-slate-800/20">
+                            <td class="p-3 text-slate-400">{t.date}</td>
+                            <td class="p-3 font-bold text-white">{t.symbol}</td>
+                            <td class="p-3"><span class="bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold">{t.direction}</span></td>
+                            <td class="p-3 font-mono">₹{t.entry} / ₹{t.exit}</td>
+                            <td class={`p-3 font-bold ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>+₹{t.pnl}</td>
+                            <td class="p-3 text-slate-300">{t.strategy}</td>
+                            <td class="p-3"><span class="bg-blue-950 text-blue-400 border border-blue-800 px-2 py-0.5 rounded text-[10px]">{t.outcome}</span></td>
+                            <td class="p-3"><button onClick={() => deleteTrade(t.id)} class="text-rose-400 hover:underline">Delete</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. STRATEGIES TAB */}
+              {currentTab === 'Strategies' && (
+                <div class="space-y-4">
+                  <h2 class="font-bold text-sm text-white">Active Strategies Performance</h2>
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {["Channel Breakout", "Triangle Pattern", "Inside Candle"].map((s, i) => (
+                      <div key={i} class="bg-[#101422] border border-slate-800 p-4 rounded-xl space-y-2 text-xs">
+                        <div class="flex justify-between items-center">
+                          <span class="font-bold text-white text-sm">{s}</span>
+                          <span class="bg-emerald-950 text-emerald-400 font-bold px-2 py-0.5 rounded text-[10px]">100% Win Rate</span>
+                        </div>
+                        <p class="text-slate-400 text-[11px]">Clean breakout entry with volume confirmation.</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 5. RULES TAB */}
+              {currentTab === 'Rules' && (
+                <div class="space-y-4">
+                  <h2 class="font-bold text-sm text-white">Rules Performance Analysis</h2>
+                  <div class="bg-[#101422] border border-slate-800 p-4 rounded-xl space-y-3 text-xs">
+                    {["Followed risk management rules 100%", "Waited for entry confirmation candle", "Traded in direction of HTF trend", "Avoided revenge trading"].map((r, i) => (
+                      <div key={i} class="flex justify-between items-center p-2 bg-slate-900 rounded border border-slate-800">
+                        <span class="text-slate-200">{r}</span>
+                        <span class="text-emerald-400 font-bold">100% Followed</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 6. MISTAKES TAB */}
+              {currentTab === 'Mistakes' && (
+                <div class="space-y-4">
+                  <h2 class="font-bold text-sm text-white">Mistakes & Psychology Audit</h2>
+                  <div class="bg-[#101422] border border-slate-800 p-4 rounded-xl space-y-3 text-xs">
+                    {["Overtrading", "FOMO Entry", "Early Exit due to Fear", "Trading Without Stop Loss"].map((m, i) => (
+                      <div key={i} class="flex justify-between items-center p-2 bg-slate-900 rounded border border-slate-800">
+                        <span class="text-rose-300 font-bold">{m}</span>
+                        <span class="text-slate-400">0 Occurrences</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 7. AI SUMMARIZER TAB */}
+              {currentTab === 'AI Summarizer' && (
+                <div class="bg-[#101422] border border-slate-800 p-5 rounded-xl space-y-4 text-xs">
+                  <h2 class="font-bold text-sm text-white">AI Trading Analysis</h2>
+                  <p class="text-slate-400">Analyze your trading performance and mistake patterns instantly.</p>
+                  <button class="bg-blue-600 text-white font-bold px-4 py-2 rounded">🤖 Generate AI Summary</button>
+                </div>
+              )}
+
+              {/* 8. REPORTS TAB */}
+              {currentTab === 'Reports' && (
+                <div class="grid grid-cols-2 gap-4 text-xs">
+                  <div class="bg-[#101422] border border-slate-800 p-4 rounded-xl space-y-2">
+                    <span class="font-bold text-slate-300">Holding Duration</span>
+                    <p class="text-slate-400">Avg Holding Time: <span class="text-blue-400 font-bold">12 mins</span></p>
+                  </div>
+                  <div class="bg-[#101422] border border-slate-800 p-4 rounded-xl space-y-2">
+                    <span class="font-bold text-slate-300">Session Win Rate</span>
+                    <p class="text-slate-400">Morning Session: <span class="text-emerald-400 font-bold">100%</span></p>
+                  </div>
+                </div>
+              )}
+
+              {/* 9. RISK MANAGEMENT TAB */}
+              {currentTab === 'Risk Management' && (
+                <div class="bg-[#101422] border border-slate-800 p-4 rounded-xl space-y-3 text-xs">
+                  <h2 class="font-bold text-sm text-white">Risk Metrics</h2>
+                  <div class="grid grid-cols-3 gap-3">
+                    <div class="bg-slate-900 p-3 rounded border border-slate-800">
+                      <p class="text-[10px] text-slate-500">AVG RISK / TRADE</p>
+                      <p class="text-lg font-bold text-white mt-1">₹180</p>
+                    </div>
+                    <div class="bg-slate-900 p-3 rounded border border-slate-800">
+                      <p class="text-[10px] text-slate-500">STOP LOSS DISCIPLINE</p>
+                      <p class="text-lg font-bold text-emerald-400 mt-1">100%</p>
+                    </div>
+                    <div class="bg-slate-900 p-3 rounded border border-slate-800">
+                      <p class="text-[10px] text-slate-500">MAX DRAWDOWN</p>
+                      <p class="text-lg font-bold text-blue-400 mt-1">₹0</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 10. MARKET ANALYSIS TAB */}
+              {currentTab === 'Market Analysis' && (
+                <div class="bg-[#101422] border border-slate-800 p-4 rounded-xl space-y-3">
+                  <h2 class="text-xs font-bold text-slate-300">Live TradingView Analysis</h2>
+                  <div class="w-full h-[500px] rounded-xl overflow-hidden border border-slate-800">
+                    <iframe src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_1&symbol=NSE%3ANIFTY&interval=5&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=dark&style=1" class="w-full h-full border-0"></iframe>
+                  </div>
+                </div>
+              )}
+
+              {/* 11. PAPER TRADING TAB */}
+              {currentTab === 'Paper trading' && (
+                <div class="space-y-4 text-xs">
+                  <div class="bg-[#101422] border border-slate-800 p-3 rounded-xl flex justify-between items-center">
+                    <span class="font-extrabold text-blue-400">PaperDesk Options Trading</span>
+                    <span class="text-amber-400 font-bold">Mon-Fri 9:15 AM - 3:30 PM</span>
+                  </div>
+                  <div class="bg-[#101422] border border-slate-800 rounded-xl overflow-x-auto font-mono text-center">
+                    <table class="w-full">
+                      <thead class="bg-slate-950 text-slate-500 text-[10px]">
+                        <tr>
+                          <th class="p-2 border-r border-slate-800">CALL OI %</th>
+                          <th class="p-2 border-r border-slate-800">CALL PRICE</th>
+                          <th class="p-2 border-r border-slate-800 text-blue-400">STRIKE</th>
+                          <th class="p-2 border-r border-slate-800">PUT PRICE</th>
+                          <th class="p-2">PUT OI %</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-800/60">
+                        {[22300, 22350, 22400, 22450, 22500].map((s) => (
+                          <tr key={s} class={s === 22400 ? "bg-blue-950/40 font-bold" : "hover:bg-slate-800/20"}>
+                            <td class="p-2.5 text-emerald-400 border-r border-slate-800">+1298%</td>
+                            <td class="p-2.5 border-r border-slate-800">₹156.95</td>
+                            <td class="p-2.5 border-r border-slate-800 font-bold text-white bg-slate-900">{s}</td>
+                            <td class="p-2.5 border-r border-slate-800">₹103.60</td>
+                            <td class="p-2.5 text-emerald-400">+99%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* 12. COMMUNITY TAB */}
+              {currentTab === 'Community' && (
+                <div class="space-y-4 text-xs">
+                  <h2 class="font-bold text-sm text-white">Trading Community Circles</h2>
+                  <div class="grid grid-cols-2 gap-3">
+                    {["Intraday Pit", "Long-Term Lounge", "Swing Room", "Options Lab"].map((c, i) => (
+                      <div key={i} class="bg-[#101422] border border-slate-800 p-3.5 rounded-xl flex justify-between items-center">
+                        <div>
+                          <p class="font-bold text-white">{c}</p>
+                          <p class="text-[10px] text-slate-500">Live setup discussions</p>
+                        </div>
+                        <button class="bg-blue-600 text-white px-2.5 py-1 rounded text-[10px] font-bold">Join</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 13. CHALLENGE TAB */}
+              {currentTab === 'Challenge' && (
+                <div class="bg-[#101422] border border-slate-800 p-5 rounded-xl space-y-3 text-xs">
+                  <h2 class="font-bold text-sm text-white">Capital Growth Challenge</h2>
+                  <p class="text-slate-400">Track your progress towards growth goals.</p>
+                  <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+                    <div class="bg-emerald-500 h-full w-[25%]"></div>
+                  </div>
+                </div>
+              )}
+
+              {/* 14. CALENDAR TAB */}
+              {currentTab === 'Calendar' && (
+                <div class="bg-[#101422] border border-slate-800 p-5 rounded-xl space-y-4">
+                  <h2 class="font-bold text-sm text-white">P&L Calendar Heatmap</h2>
+                  <div class="grid grid-cols-7 gap-2 text-center text-xs">
+                    {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(d => <div key={d} class="text-slate-500 text-[10px] font-bold">{d}</div>)}
+                    {Array.from({ length: 28 }).map((_, i) => (
+                      <div key={i} class={`h-14 border border-slate-800 rounded-lg p-1 text-left ${i === 0 ? 'bg-emerald-950 border-emerald-800 text-emerald-400 font-bold' : 'bg-slate-950 text-slate-600'}`}>
+                        <span class="text-[9px]">{i + 1}</span>
+                        {i === 0 && <span class="block text-[10px] mt-2">+₹55</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 15. AFFILIATE TAB */}
+              {currentTab === 'Affiliate' && (
+                <div class="bg-[#101422] border border-slate-800 p-5 rounded-xl space-y-3 text-xs">
+                  <h2 class="font-bold text-sm text-white">Affiliate Dashboard</h2>
+                  <p class="text-slate-400">Referral Code: <span class="font-bold text-blue-400">GAUR5766</span></p>
+                  <p class="text-slate-400">Lifetime Earnings: <span class="font-bold text-emerald-400">₹200.00</span></p>
+                </div>
+              )}
+
+            </div>
+          </main>
+
+          {/* New Trade Modal */}
+          {showModal && (
+            <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div class="bg-[#101422] border border-slate-800 rounded-xl w-full max-w-md p-5 space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                  <h3 class="font-bold text-xs text-white">Log Trade Execution</h3>
+                  <button onClick={() => setShowModal(false)} class="text-slate-500 hover:text-white">✕</button>
+                </div>
+                <form onSubmit={handleAddTrade} class="space-y-3 text-xs">
+                  <input type="text" placeholder="Symbol (NUVAMA)" value={formData.symbol} onChange={e=>setFormData({...formData, symbol: e.target.value.toUpperCase()})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded" required />
+                  <div class="grid grid-cols-2 gap-2">
+                    <input type="number" placeholder="Entry" value={formData.entry} onChange={e=>setFormData({...formData, entry: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
+                    <input type="number" placeholder="Exit" value={formData.exit} onChange={e=>setFormData({...formData, exit: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
+                  </div>
+                  <button type="submit" class="w-full bg-blue-600 font-bold py-2.5 rounded text-white shadow-md">
+                    Save Execution
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Trade Diary Pro - Full Interactive Navigation Suite</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
