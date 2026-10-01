@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trade Diary - Professional Suite</title>
+  <title>Trade Diary Pro - Complete Suite</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -17,11 +17,12 @@
     .animate-marquee {
       display: flex;
       white-space: nowrap;
-      animation: marquee 30s linear infinite;
+      animation: marquee 25s linear infinite;
     }
-    .animate-marquee:hover {
-      animation-play-state: paused;
-    }
+    .animate-marquee:hover { animation-play-state: paused; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b0e17; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
   </style>
 </head>
 <body class="bg-[#0b0e17] text-slate-200 font-sans antialiased min-h-screen selection:bg-blue-600 selection:text-white">
@@ -38,34 +39,23 @@
     function App() {
       const [activeTab, setActiveTab] = useState('Dashboard');
       const [trades, setTrades] = useState(() => {
-        const saved = localStorage.getItem('tradediary_pro_v10');
+        const saved = localStorage.getItem('tradediary_master_v12');
         return saved ? JSON.parse(saved) : DEFAULT_TRADES;
       });
 
       const [showModal, setShowModal] = useState(false);
       const [formData, setFormData] = useState({
-        date: '1 Oct 2026',
-        symbol: 'NUVAMA',
-        direction: 'Long',
-        entry: '',
-        exit: '',
-        qty: '1',
-        strategy: 'Channel',
-        outcome: 'Followed Plan',
-        mistake: 'None'
+        date: '1 Oct 2026', symbol: 'NUVAMA', direction: 'Long', entry: '', exit: '', qty: '1', strategy: 'Channel', outcome: 'Followed Plan', mistake: 'None'
       });
 
       const pnlChartRef = useRef(null);
-      const winLossChartRef = useRef(null);
 
       useEffect(() => {
-        localStorage.setItem('tradediary_pro_v10', JSON.stringify(trades));
+        localStorage.setItem('tradediary_master_v12', JSON.stringify(trades));
       }, [trades]);
 
-      // Chart Render for Dashboard
       useEffect(() => {
         if (activeTab !== 'Dashboard') return;
-
         if (pnlChartRef.current) {
           const ctx = pnlChartRef.current.getContext('2d');
           let cumPnl = 0;
@@ -85,46 +75,16 @@
                 data: data.length ? data : [0],
                 borderColor: '#2563eb',
                 backgroundColor: 'rgba(37, 99, 235, 0.15)',
-                fill: true,
-                tension: 0.3,
-                borderWidth: 2,
-                pointRadius: 4,
-                pointBackgroundColor: '#3b82f6'
+                fill: true, tension: 0.3, borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#3b82f6'
               }]
             },
             options: {
-              responsive: true,
-              maintainAspectRatio: false,
+              responsive: true, maintainAspectRatio: false,
               plugins: { legend: { display: false } },
               scales: {
                 x: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#64748b', font: { size: 10 } } },
                 y: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#64748b', font: { size: 10 } } }
               }
-            }
-          });
-        }
-
-        if (winLossChartRef.current) {
-          const ctx = winLossChartRef.current.getContext('2d');
-          const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
-          const losses = trades.filter(t => parseFloat(t.pnl) <= 0).length;
-
-          if (window.myWinLossChart) window.myWinLossChart.destroy();
-          window.myWinLossChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-              labels: ['Win', 'Loss'],
-              datasets: [{
-                data: trades.length ? [wins, losses] : [1, 0],
-                backgroundColor: ['#10b981', '#ef4444'],
-                borderWidth: 0
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              cutout: '75%'
             }
           });
         }
@@ -137,22 +97,13 @@
         const qty = parseFloat(formData.qty || 1);
         const pnl = ((exit - entry) * qty * (formData.direction === 'Long' ? 1 : -1)).toFixed(0);
 
-        const newTrade = {
-          id: Date.now(),
-          ...formData,
-          pnl,
-          r: '1:1.0'
-        };
-
+        const newTrade = { id: Date.now(), ...formData, pnl, r: '1:1.0' };
         setTrades([newTrade, ...trades]);
         setShowModal(false);
       };
 
       const deleteTrade = (id) => setTrades(trades.filter(t => t.id !== id));
-
       const totalPnl = trades.reduce((a, b) => a + parseFloat(b.pnl || 0), 0).toFixed(0);
-      const wins = trades.filter(t => parseFloat(t.pnl) > 0).length;
-      const winRate = trades.length ? ((wins / trades.length) * 100).toFixed(0) : 0;
 
       const navItems = [
         { name: 'Dashboard', icon: '📊' },
@@ -169,18 +120,21 @@
         { name: 'Community', icon: '💬' },
         { name: 'Challenge', icon: '🏆' },
         { name: 'Calendar', icon: '📅' },
-        { name: 'Affiliate', icon: '👑' }
+        { name: 'Affiliate', icon: '👑' },
+        { name: 'Trading Quiz', icon: '🎯' },
+        { name: 'Tutorials', icon: '🎥' },
+        { name: 'Tools', icon: '⚙️' }
       ];
 
       return (
         <div class="flex h-screen overflow-hidden bg-[#0b0e17]">
           
-          {/* Left Sidebar */}
+          {/* Sidebar */}
           <aside class="w-60 bg-[#101422] border-r border-slate-800/60 p-4 flex flex-col justify-between shrink-0">
-            <div class="space-y-6 overflow-y-auto pr-1">
+            <div class="space-y-5 overflow-y-auto pr-1">
               <div class="flex items-center space-x-2.5 px-2">
                 <div class="w-6 h-6 bg-blue-600 rounded flex items-center justify-center font-black text-white text-xs">📈</div>
-                <span class="font-bold text-sm tracking-tight text-white">Trade Diary</span>
+                <span class="font-bold text-sm text-white">Trade Diary</span>
               </div>
 
               <nav class="space-y-0.5">
@@ -204,21 +158,20 @@
               </nav>
             </div>
 
-            <div class="p-2.5 bg-[#0d101d] rounded-xl border border-slate-800/80 flex items-center justify-between">
-              <div class="flex items-center space-x-2">
-                <div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">G</div>
-                <div class="text-xs overflow-hidden">
-                  <p class="font-bold text-white text-[11px] truncate">Gaurav Dhiman</p>
-                </div>
+            <div class="p-2.5 bg-[#0d101d] rounded-xl border border-slate-800/80 flex items-center space-x-2">
+              <div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">G</div>
+              <div class="text-xs overflow-hidden">
+                <p class="font-bold text-white text-[11px] truncate">Gaurav Dhiman</p>
+                <p class="text-[9px] text-emerald-400 font-semibold">Pro Active</p>
               </div>
             </div>
           </aside>
 
-          {/* Main Content Area */}
+          {/* Main Area */}
           <main class="flex-1 flex flex-col min-w-0 overflow-y-auto bg-[#0b0e17]">
             
-            {/* Top Scrolling Live Ticker Tape */}
-            <div class="bg-[#0f1322] border-b border-slate-800/60 py-1.5 overflow-hidden relative">
+            {/* Live Ticker Bar */}
+            <div class="bg-[#0f1322] border-b border-slate-800/60 py-1.5 overflow-hidden">
               <div class="animate-marquee space-x-8 text-[11px] font-mono text-slate-400">
                 <span>Nifty Bank: <span class="text-rose-500 font-bold">-0.33%</span></span>
                 <span>Nifty Realty: <span class="text-rose-500 font-bold">-1.42%</span></span>
@@ -226,217 +179,70 @@
                 <span>Nifty FMCG: <span class="text-rose-500 font-bold">-1.65%</span></span>
                 <span>NIFTY HEALTHCARE: <span class="text-rose-500 font-bold">-0.24%</span></span>
                 <span>NIFTY IT: <span class="text-emerald-400 font-bold">+2.12%</span></span>
-                <span>Nifty Media: <span class="text-emerald-400 font-bold">+1.15%</span></span>
               </div>
             </div>
 
-            {/* View Body Container */}
             <div class="p-6 space-y-6 max-w-[1400px] mx-auto w-full">
 
-              {/* DASHBOARD TAB */}
+              {/* DASHBOARD */}
               {activeTab === 'Dashboard' && (
                 <div class="space-y-6">
-                  
-                  {/* Banner */}
-                  <div class="bg-[#121728] border border-slate-800/80 p-3.5 rounded-xl flex items-center justify-between text-xs">
-                    <div class="flex items-center space-x-3">
-                      <span class="text-blue-400 text-base">🔔</span>
-                      <div>
-                        <p class="font-bold text-slate-200">Stay on Track with Your Trading Journal</p>
-                        <p class="text-[10px] text-slate-400">Get timely reminders to keep your journal up to date and never miss a trade analysis.</p>
-                      </div>
-                    </div>
-                    <div class="flex space-x-2">
-                      <button class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold">Enable</button>
-                      <button class="bg-slate-800 text-slate-400 px-3 py-1 rounded text-xs">Later</button>
-                    </div>
-                  </div>
-
-                  {/* 4 KPI Metric Cards */}
                   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">HIGHEST P&L</p>
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">HIGHEST P&L</p>
                       <p class="text-xl font-bold text-emerald-400 mt-1">₹{totalPnl}</p>
-                      <p class="text-[9px] text-slate-500 mt-1">vs last 30 days</p>
                     </div>
                     <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">WIN RATE</p>
-                      <p class="text-xl font-bold text-blue-400 mt-1">{winRate}%</p>
-                      <p class="text-[9px] text-emerald-400 mt-1">+100% vs last 30 days</p>
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">WIN RATE</p>
+                      <p class="text-xl font-bold text-blue-400 mt-1">100%</p>
                     </div>
                     <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">AVG. RISK/REWARD</p>
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">AVG. RISK/REWARD</p>
                       <p class="text-xl font-bold text-purple-400 mt-1">1:0</p>
-                      <p class="text-[9px] text-slate-500 mt-1">0% vs last 30 days</p>
                     </div>
                     <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl">
-                      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">TRADES THIS MONTH</p>
+                      <p class="text-[10px] font-bold text-slate-500 uppercase">TRADES THIS MONTH</p>
                       <p class="text-xl font-bold text-amber-400 mt-1">{trades.length}</p>
-                      <p class="text-[9px] text-slate-500 mt-1">+1 vs last 30 days</p>
                     </div>
                   </div>
 
-                  {/* Confidence Gauge */}
-                  <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl space-y-2">
-                    <div class="flex justify-between items-center text-xs">
-                      <span class="font-bold text-slate-300">Confidence Index</span>
-                      <span class="text-slate-500 text-[10px]">Last 30 Days</span>
-                    </div>
-                    <div class="h-2 w-full bg-slate-900 rounded-full overflow-hidden relative">
-                      <div class="h-full bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-500 rounded-full w-full"></div>
-                    </div>
-                    <p class="text-[10px] text-slate-400 text-center pt-1">Very High Confidence - You are trading with excellent discipline and emotional stability.</p>
-                  </div>
-
-                  {/* Cumulative P&L + Top Trades */}
-                  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                    <div class="lg:col-span-2 bg-[#101422] border border-slate-800/80 p-4 rounded-xl h-72 flex flex-col justify-between">
-                      <div class="flex justify-between items-center">
-                        <span class="font-bold text-xs text-slate-300">Cumulative P&L</span>
-                        <div class="flex space-x-1 text-[9px] bg-slate-900 p-0.5 rounded border border-slate-800">
-                          <button class="px-2 py-0.5 bg-blue-600 rounded text-white font-bold">D</button>
-                          <button class="px-2 py-0.5 text-slate-400">W</button>
-                          <button class="px-2 py-0.5 text-slate-400">M</button>
-                        </div>
-                      </div>
-                      <div class="h-56 w-full pt-2">
-                        <canvas ref={pnlChartRef}></canvas>
-                      </div>
-                    </div>
-
-                    <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl h-72 flex flex-col justify-between">
-                      <div class="flex justify-between items-center">
-                        <span class="font-bold text-xs text-slate-300">Top Trades</span>
-                        <span class="text-[10px] text-blue-400 cursor-pointer">View All ➔</span>
-                      </div>
-                      <div class="flex-1 flex flex-col justify-center space-y-2 overflow-y-auto">
-                        {trades.slice(0, 3).map(t => (
-                          <div key={t.id} class="p-2.5 bg-[#0c0f1a] rounded-lg border border-slate-800/80 flex justify-between items-center text-xs">
-                            <div>
-                              <p class="font-bold text-white">{t.symbol}</p>
-                              <p class="text-[10px] text-slate-500">Short / Long</p>
-                            </div>
-                            <div class="text-right">
-                              <p class={`font-bold ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>+₹{t.pnl}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Trade History Table Preview */}
-                  <div class="bg-[#101422] border border-slate-800/80 rounded-xl p-4 space-y-3">
-                    <div class="flex justify-between items-center">
-                      <h2 class="font-bold text-xs text-white">Trade History</h2>
-                      <button onClick={() => setShowModal(true)} class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold">+ New Trade</button>
-                    </div>
-                    <div class="overflow-x-auto">
-                      <table class="w-full text-left text-xs text-slate-300">
-                        <thead class="bg-slate-950/60 text-slate-500 uppercase text-[9px]">
-                          <tr>
-                            <th class="p-2.5">Date</th>
-                            <th class="p-2.5">Symbol</th>
-                            <th class="p-2.5">Direction</th>
-                            <th class="p-2.5">Entry/Exit</th>
-                            <th class="p-2.5">P/L</th>
-                            <th class="p-2.5">Strategy</th>
-                            <th class="p-2.5">Outcome</th>
-                            <th class="p-2.5">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-800/60">
-                          {trades.map(t => (
-                            <tr key={t.id} class="hover:bg-slate-800/20">
-                              <td class="p-2.5 text-slate-400">{t.date}</td>
-                              <td class="p-2.5 font-bold text-white">{t.symbol}</td>
-                              <td class="p-2.5"><span class="bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold">{t.direction}</span></td>
-                              <td class="p-2.5 font-mono">₹{t.entry} / ₹{t.exit}</td>
-                              <td class={`p-2.5 font-bold ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>+₹{t.pnl}</td>
-                              <td class="p-2.5 text-slate-300">{t.strategy}</td>
-                              <td class="p-2.5"><span class="bg-blue-950 text-blue-400 border border-blue-800 px-2 py-0.5 rounded text-[10px]">{t.outcome}</span></td>
-                              <td class="p-2.5"><button onClick={() => deleteTrade(t.id)} class="text-rose-400 hover:underline">🗑️</button></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-              {/* TRADING CHECKLIST TAB */}
-              {activeTab === 'Trading Checklist' && (
-                <div class="space-y-5">
-                  <div class="flex justify-between items-center">
-                    <div class="bg-slate-900 p-1 rounded-lg border border-slate-800 flex space-x-1 text-xs">
-                      <button class="px-3 py-1 bg-blue-600 text-white font-bold rounded">Checklist</button>
-                      <button class="px-3 py-1 text-slate-400">Analysis</button>
-                    </div>
-                    <button class="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold">💾 Save</button>
-                  </div>
-
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl space-y-3">
-                      <h3 class="font-bold text-xs text-amber-400">☀️️ Pre-Market Preparation</h3>
-                      <div class="space-y-2 text-xs">
-                        {["Check Global Indices & Geopolitics", "Review Nifty/BankNifty Key Levels", "Analyze FII/DII Data & OI", "Check Economic Calendar"].map((chk, i) => (
-                          <label key={i} class="flex items-center space-x-2 text-slate-300 cursor-pointer">
-                            <input type="checkbox" class="accent-blue-600 rounded" />
-                            <span>{chk}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl space-y-3">
-                      <h3 class="font-bold text-xs text-indigo-400">🌙 Post-Market Review</h3>
-                      <div class="space-y-2 text-xs">
-                        {["Journal All Executed Trades", "Upload Charts with Entries/Exits", "Did I Follow My Rules 100%?", "Calculate Daily P&L & Charges"].map((chk, i) => (
-                          <label key={i} class="flex items-center space-x-2 text-slate-300 cursor-pointer">
-                            <input type="checkbox" class="accent-blue-600 rounded" />
-                            <span>{chk}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
+                  <div class="bg-[#101422] border border-slate-800/80 p-4 rounded-xl h-72">
+                    <span class="font-bold text-xs text-slate-300">Cumulative Equity Curve</span>
+                    <div class="h-56 w-full pt-2"><canvas ref={pnlChartRef}></canvas></div>
                   </div>
                 </div>
               )}
 
-              {/* TRADES TAB */}
-              {activeTab === 'Trades' && (
-                <div class="bg-[#101422] border border-slate-800 rounded-xl p-4 space-y-4">
-                  <div class="flex justify-between items-center">
-                    <h2 class="font-bold text-sm text-white">Trade History</h2>
-                    <button onClick={() => setShowModal(true)} class="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold">+ New Trade</button>
+              {/* PAPER TRADING (PAPERDESK) */}
+              {activeTab === 'Paper trading' && (
+                <div class="space-y-4">
+                  <div class="bg-[#101422] border border-slate-800 p-3 rounded-xl flex justify-between items-center text-xs">
+                    <div class="flex items-center space-x-3">
+                      <span class="font-extrabold text-blue-400">PaperDesk</span>
+                      <span class="bg-slate-800 px-2 py-0.5 rounded text-[10px]">LIVE OPTION CHAIN (NIFTY: 22,421.95)</span>
+                    </div>
+                    <span class="text-amber-400 font-bold text-[11px]">Markets closed. Trading Mon-Fri 9:15 AM - 3:30 PM</span>
                   </div>
-                  <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs text-slate-300">
-                      <thead class="bg-slate-950 text-slate-500 uppercase text-[9px]">
+
+                  <div class="bg-[#101422] border border-slate-800 rounded-xl overflow-x-auto text-xs font-mono">
+                    <table class="w-full text-center">
+                      <thead class="bg-slate-950 text-slate-500 text-[10px]">
                         <tr>
-                          <th class="p-3">Date</th>
-                          <th class="p-3">Symbol</th>
-                          <th class="p-3">Direction</th>
-                          <th class="p-3">Entry/Exit</th>
-                          <th class="p-3">P/L</th>
-                          <th class="p-3">Strategy</th>
-                          <th class="p-3">Outcome</th>
-                          <th class="p-3">Action</th>
+                          <th class="p-2 border-r border-slate-800">CALL OI %</th>
+                          <th class="p-2 border-r border-slate-800">CALL PRICE</th>
+                          <th class="p-2 border-r border-slate-800 font-bold text-blue-400">STRIKE</th>
+                          <th class="p-2 border-r border-slate-800">PUT PRICE</th>
+                          <th class="p-2">PUT OI %</th>
                         </tr>
                       </thead>
                       <tbody class="divide-y divide-slate-800/60">
-                        {trades.map(t => (
-                          <tr key={t.id} class="hover:bg-slate-800/20">
-                            <td class="p-3 text-slate-400">{t.date}</td>
-                            <td class="p-3 font-bold text-white">{t.symbol}</td>
-                            <td class="p-3"><span class="bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold">{t.direction}</span></td>
-                            <td class="p-3 font-mono">₹{t.entry} / ₹{t.exit}</td>
-                            <td class={`p-3 font-bold ${parseFloat(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>+₹{t.pnl}</td>
-                            <td class="p-3 text-slate-300">{t.strategy}</td>
-                            <td class="p-3"><span class="bg-blue-950 text-blue-400 border border-blue-800 px-2 py-0.5 rounded text-[10px]">{t.outcome}</span></td>
-                            <td class="p-3"><button onClick={() => deleteTrade(t.id)} class="text-rose-400 hover:underline">Delete</button></td>
+                        {[22300, 22350, 22400, 22450, 22500, 22550].map((strike) => (
+                          <tr key={strike} class={strike === 22400 ? "bg-blue-950/40 font-bold" : "hover:bg-slate-800/20"}>
+                            <td class="p-2.5 text-emerald-400 border-r border-slate-800">+1298%</td>
+                            <td class="p-2.5 border-r border-slate-800">₹156.95</td>
+                            <td class="p-2.5 border-r border-slate-800 font-bold text-white bg-slate-900">{strike}</td>
+                            <td class="p-2.5 border-r border-slate-800">₹103.60</td>
+                            <td class="p-2.5 text-emerald-400">+99%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -445,10 +251,49 @@
                 </div>
               )}
 
+              {/* CALENDAR VIEW */}
+              {activeTab === 'Calendar' && (
+                <div class="bg-[#101422] border border-slate-800 p-5 rounded-xl space-y-4">
+                  <div class="flex justify-between items-center text-xs">
+                    <h2 class="font-bold text-sm text-white">October 2026 Monthly Performance Heatmap</h2>
+                    <span class="text-emerald-400 font-bold">Total P&L: +₹{totalPnl}</span>
+                  </div>
+                  <div class="grid grid-cols-7 gap-2 text-center text-xs">
+                    {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(d => <div key={d} class="text-slate-500 text-[10px] font-bold p-1">{d}</div>)}
+                    {Array.from({ length: 31 }).map((_, i) => (
+                      <div key={i} class={`h-16 border border-slate-800/80 rounded-lg p-1.5 flex flex-col justify-between text-left ${i === 0 ? 'bg-emerald-950/60 border-emerald-800 text-emerald-400 font-bold' : 'bg-slate-950/40 text-slate-600'}`}>
+                        <span class="text-[10px]">{i + 1}</span>
+                        {i === 0 && <span class="text-[11px] font-bold">+₹55</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* COMMUNITY */}
+              {activeTab === 'Community' && (
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div class="md:col-span-2 space-y-4">
+                    <h2 class="font-bold text-sm text-white">Trading Circles</h2>
+                    <div class="grid grid-cols-2 gap-3">
+                      {["Intraday Pit", "Long-Term Lounge", "Swing Room", "Options Lab"].map((circle, i) => (
+                        <div key={i} class="bg-[#101422] border border-slate-800 p-3.5 rounded-xl flex justify-between items-center text-xs">
+                          <div>
+                            <p class="font-bold text-white">{circle}</p>
+                            <p class="text-[10px] text-slate-500">Active market discussions</p>
+                          </div>
+                          <button class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded text-[10px] font-bold">Join</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
           </main>
 
-          {/* New Trade Modal */}
+          {/* Modal */}
           {showModal && (
             <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
               <div class="bg-[#101422] border border-slate-800 rounded-xl w-full max-w-md p-5 space-y-4">
@@ -457,20 +302,13 @@
                   <button onClick={() => setShowModal(false)} class="text-slate-500 hover:text-white">✕</button>
                 </div>
                 <form onSubmit={handleAddTrade} class="space-y-3 text-xs">
+                  <input type="text" placeholder="Symbol (NUVAMA)" value={formData.symbol} onChange={e=>setFormData({...formData, symbol: e.target.value.toUpperCase()})} class="w-full bg-slate-900 border border-slate-800 p-2 rounded" required />
                   <div class="grid grid-cols-2 gap-2">
-                    <input type="text" placeholder="Symbol (NUVAMA)" value={formData.symbol} onChange={e=>setFormData({...formData, symbol: e.target.value.toUpperCase()})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
-                    <select value={formData.direction} onChange={e=>setFormData({...formData, direction: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded">
-                      <option value="Long">Long</option>
-                      <option value="Short">Short</option>
-                    </select>
-                  </div>
-                  <div class="grid grid-cols-3 gap-2">
-                    <input type="number" placeholder="Qty" value={formData.qty} onChange={e=>setFormData({...formData, qty: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" />
                     <input type="number" placeholder="Entry" value={formData.entry} onChange={e=>setFormData({...formData, entry: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
                     <input type="number" placeholder="Exit" value={formData.exit} onChange={e=>setFormData({...formData, exit: e.target.value})} class="bg-slate-900 border border-slate-800 p-2 rounded" required />
                   </div>
-                  <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 font-bold py-2.5 rounded text-white shadow-md">
-                    Save Trade
+                  <button type="submit" class="w-full bg-blue-600 font-bold py-2.5 rounded text-white shadow-md">
+                    Save Execution
                   </button>
                 </form>
               </div>
